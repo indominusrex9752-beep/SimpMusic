@@ -31,6 +31,7 @@ import com.maxrave.simpmusic.viewModel.PlaylistUIState.Error
 import com.maxrave.simpmusic.viewModel.PlaylistUIState.Loading
 import com.maxrave.simpmusic.viewModel.PlaylistUIState.Success
 import com.maxrave.simpmusic.viewModel.base.BaseViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -54,7 +55,6 @@ import simpmusic.composeapp.generated.resources.playlist_is_empty
 import simpmusic.composeapp.generated.resources.radio
 import simpmusic.composeapp.generated.resources.radio_not_available
 import simpmusic.composeapp.generated.resources.shuffle
-import simpmusic.composeapp.generated.resources.shuffle_not_available
 import simpmusic.composeapp.generated.resources.synced
 import simpmusic.composeapp.generated.resources.syncing
 import simpmusic.composeapp.generated.resources.view_count
@@ -314,7 +314,7 @@ class PlaylistViewModel(
         }
     }
 
-    private fun getPlaylistEntity(
+        private fun getPlaylistEntity(
         id: String,
         playlistBrowse: PlaylistBrowse? = null,
     ) {
@@ -492,10 +492,89 @@ class PlaylistViewModel(
 
             PlaylistUIEvent.Shuffle -> {
                 val shuffleEndpoint = data.shuffleEndpoint
+
                 if (shuffleEndpoint == null) {
-                    makeToast(
-                        getString(Res.string.shuffle_not_available),
-                    )
+                    viewModelScope.launch {
+                        try {
+                            val allTracks = tracks.value.toMutableList()
+                            val visitedContinuations = mutableSetOf<String>()
+                            var nextContinuation = continuation.value
+
+                            // Fetch every remaining page before shuffling.
+                            while (!nextContinuation.isNullOrEmpty()) {
+                                if (!visitedContinuations.add(nextContinuation)) {
+                                    throw IllegalStateException(
+                                        "Repeated playlist continuation token",
+                                    )
+                                }
+
+                                val page = songRepository
+                                    .getContinueTrack(
+                                        data.id,
+                                        nextContinuation,
+                                        fromPlaylist = true,
+                                    )
+                                    .firstOrNull()
+                                    ?: throw IllegalStateException(
+                                        "Unable to load the next playlist page",
+                                    )
+
+                                val pageTracks = page.first
+                                    ?: throw IllegalStateException(
+                                        "Playlist page returned no track data",
+                                    )
+
+                                allTracks.addAll(pageTracks)
+                                nextContinuation = page.second
+                            }
+
+                            if (allTracks.isEmpty()) {
+                                makeToast(getString(Res.string.playlist_is_empty))
+                                return@launch
+                            }
+
+                            // Store the fully loaded playlist and mark pagination complete.
+                            _tracks.value = allTracks
+                            _continuation.value = null
+                            _tracksListState.value = ListState.PAGINATION_EXHAUST
+
+                            val shuffledTracks = allTracks.shuffled()
+                            val firstTrack = shuffledTracks.first()
+
+                            setQueueData(
+                                QueueData.Data(
+                                    listTracks = shuffledTracks.toCollection(arrayListOf<Track>()),
+                                    firstPlayedTrack = firstTrack,
+                                    playlistId = data.id,
+                                    playlistName = "\"${data.title}\" ${getString(Res.string.shuffle)}",
+                                    playlistType = PlaylistType.PLAYLIST,
+                                    continuation = null,
+                                ),
+                            )
+
+                            loadMediaItem(
+                                firstTrack,
+                                Config.PLAYLIST_CLICK,
+                                0,
+                            )
+
+                            Logger.d(
+                                tag,
+                                "Full playlist shuffle successful: ${shuffledTracks.size} tracks",
+                            )
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Logger.w(
+                                tag,
+                                "Full playlist shuffle failed: ${e.message}",
+                            )
+                            makeToast(
+                                "Couldn't load the complete playlist. Please try again.",
+                            )
+                        }
+                    }
+
                     return
                 } else {
                     viewModelScope.launch {
@@ -504,10 +583,13 @@ class PlaylistViewModel(
                             when (res) {
                                 is Resource.Success if (result != null) -> {
                                     Logger.d(tag, "Shuffle data: ${result.first.size}")
+                                    val firstTrack = result.first.firstOrNull()
+                                        ?: return@collectLatest
+
                                     setQueueData(
                                         QueueData.Data(
                                             listTracks = result.first.toCollection(arrayListOf<Track>()),
-                                            firstPlayedTrack = result.first.firstOrNull() ?: return@collectLatest,
+                                            firstPlayedTrack = firstTrack,
                                             playlistId = shuffleEndpoint.playlistId,
                                             playlistName = "\"${data.title}\" ${getString(Res.string.shuffle)}",
                                             playlistType = PlaylistType.RADIO,
@@ -515,7 +597,7 @@ class PlaylistViewModel(
                                         ),
                                     )
                                     loadMediaItem(
-                                        result.first.firstOrNull() ?: return@collectLatest,
+                                        firstTrack,
                                         Config.RADIO_CLICK,
                                         0,
                                     )
@@ -532,7 +614,7 @@ class PlaylistViewModel(
                 }
             }
 
-            PlaylistUIEvent.StartRadio -> {
+                        PlaylistUIEvent.StartRadio -> {
                 val radioEndpoint = data.radioEndpoint
                 if (radioEndpoint == null) {
                     makeToast(
@@ -646,7 +728,11 @@ class PlaylistViewModel(
             getFullTracks { tracks ->
                 tracks.forEach {
                     viewModelScope.launch {
-                        downloadUtils.downloadTrack(it.videoId, it.title, it.thumbnails?.lastOrNull()?.url ?: "")
+                        downloadUtils.downloadTrack(
+                            it.videoId,
+                            it.title,
+                            it.thumbnails?.lastOrNull()?.url ?: "",
+                        )
                     }
                 }
             }
@@ -693,14 +779,14 @@ sealed class PlaylistUIState(
     class Success(
         data: PlaylistState,
     ) : PlaylistUIState(
-            data = data,
-        )
+        data = data,
+    )
 
     class Error(
         message: String? = null,
     ) : PlaylistUIState(
-            message = message,
-        )
+        message = message,
+    )
 }
 
 sealed class PlaylistUIEvent {
