@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - dev
+      - insight-1
 
 jobs:
   build:
