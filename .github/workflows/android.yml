@@ -2,6 +2,7 @@
 name: Build SimpMusic Debug APK V4 (Insights)
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - insight-1
