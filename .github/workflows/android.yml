@@ -1,5 +1,5 @@
 
-name: Build SimpMusic Debug APK V4
+name: Build SimpMusic Debug APK V4 (Insights)
 
 on:
   push:
