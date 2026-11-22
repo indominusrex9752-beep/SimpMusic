@@ -12,24 +12,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-     - name: Checkout SimpMusic
-       uses: actions/checkout@v6
-       with:
+      - name: Checkout SimpMusic
+        uses: actions/checkout@v6
+        with:
           ref: insight-1
           submodules: recursive
 
-     - name: Use patched core
+      - name: Use patched core
         run: |
           git submodule set-url core https://github.com/indominusrex9752-beep/core.git
           git -C core fetch origin patch-1
           git -C core checkout FETCH_HEAD
 
       - name: Apply SimpMusic Insights patch
-  run: |
-    echo "Applying SimpMusic Insights..."
-    test -f SimpMusic-Insights-stage1-patch.zip
-    unzip -o SimpMusic-Insights-stage1-patch.zip -d .
-    echo "Insights patch applied."
+        run: |
+          echo "Applying SimpMusic Insights..."
+          test -f SimpMusic-Insights-stage1-patch.zip
+          unzip -o SimpMusic-Insights-stage1-patch.zip -d .
+          echo "Insights patch applied."
 
       - name: Set up Java 21
         uses: actions/setup-java@v4
@@ -53,4 +53,3 @@ jobs:
         with:
           name: SimpMusic-Patched-Debug
           path: androidApp/build/outputs/apk/debug/*.apk
-          
