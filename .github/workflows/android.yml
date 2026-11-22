@@ -17,6 +17,12 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Apply SimpMusic Insights patch
+        run: |
+          echo "Applying SimpMusic Insights..."
+          unzip -o SimpMusic-Insights-stage1-patch.zip -d .
+          echo "Insights patch applied."
+
       - name: Use patched core
         run: |
           git submodule set-url core https://github.com/indominusrex9752-beep/core.git
