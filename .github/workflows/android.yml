@@ -1,6 +1,5 @@
 
 name: Build SimpMusic Debug APK V5 (Insights UI Redesign)
-
 on:
   workflow_dispatch:
   push:
