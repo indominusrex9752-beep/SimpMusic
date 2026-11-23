@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - insight-1
+      - Insights-1
 
 jobs:
   build:
@@ -15,7 +15,7 @@ jobs:
       - name: Checkout SimpMusic
         uses: actions/checkout@v6
         with:
-          ref: insight-1
+          ref: Insights-1
           submodules: recursive
 
       - name: Use patched core
