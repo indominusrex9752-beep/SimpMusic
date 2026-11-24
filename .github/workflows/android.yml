@@ -49,9 +49,9 @@ jobs:
             exit 1
           fi
 
-          printf 'SUPABASE_URL=%s\n' "$SUPABASE_URL" >> local.properties
-          printf 'SUPABASE_PUBLISHABLE_KEY=%s\n' "$SUPABASE_PUBLISHABLE_KEY" >> local.properties
-
+          printf 'supabaseUrl=%s\n' "$SUPABASE_URL" >> local.properties
+          printf 'supabasePublishableKey=%s\n' "$SUPABASE_PUBLISHABLE_KEY" >> local.properties
+ 
       - name: Apply Cloud Sync authentication patch
         run: |
           git apply --check SimpMusic-Cloud-Sync-Auth-Stage1.patch
