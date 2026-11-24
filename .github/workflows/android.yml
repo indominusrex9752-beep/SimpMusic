@@ -1,4 +1,4 @@
-name: Build SimpMusic Debug Apk V6 (Cloud Sync)
+name: Build SimpMusic Debug Apk V7 (Cloud Sync 1)
 
 on:
   workflow_dispatch:
@@ -52,6 +52,11 @@ jobs:
           printf 'SUPABASE_URL=%s\n' "$SUPABASE_URL" >> local.properties
           printf 'SUPABASE_PUBLISHABLE_KEY=%s\n' "$SUPABASE_PUBLISHABLE_KEY" >> local.properties
 
+      - name: Apply Cloud Sync authentication patch
+        run: |
+          git apply --check SimpMusic-Cloud-Sync-Auth-Stage1.patch
+          git apply SimpMusic-Cloud-Sync-Auth-Stage1.patch
+      
       - name: Generate library definitions
         run: ./gradlew exportLibraryDefinitions
 
