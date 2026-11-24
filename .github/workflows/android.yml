@@ -1,4 +1,4 @@
-name: Build SimpMusic Debug Apk V7 (Cloud Sync Stage-1)
+name: Build SimpMusic Debug Apk V8 (Cloud Sync Stage-2)
 
 on:
   workflow_dispatch:
@@ -56,6 +56,11 @@ jobs:
         run: |
           git apply --check SimpMusic-Cloud-Sync-Auth-Stage1.patch
           git apply SimpMusic-Cloud-Sync-Auth-Stage1.patch
+
+      - name: Apply Cloud Sync UI patch
+        run: |
+          git apply --check SimpMusic-Cloud-Sync-Stage2-UI.patch
+          git apply SimpMusic-Cloud-Sync-Stage2-UI.patch   
       
       - name: Generate library definitions
         run: ./gradlew exportLibraryDefinitions
