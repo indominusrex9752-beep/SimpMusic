@@ -68,8 +68,12 @@ jobs:
       - name: Build debug APK
         run: ./gradlew androidApp:assembleDebug
 
+      
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: SimpMusic-Cloud-Sync-Debug
-          path: androidApp/build/outputs/apk/debug/*.apk
+          path: androidApp/build/outputs/apk/debug/*arm64-v8a*.apk
+          if-no-files-found: error
+          compression-level: 0
+
