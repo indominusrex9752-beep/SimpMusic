@@ -869,12 +869,26 @@ buildkonfig {
                     "discordClientId",
                     properties.getProperty("DISCORD_CLIENT_ID") ?: "",
                 )
+// Supabase client configuration
+buildConfigField(
+    STRING,
+    "supabaseUrl",
+    properties.getProperty("SUPABASE_URL") ?: "",
+)
+
+buildConfigField(
+    STRING,
+    "supabasePublishableKey",
+    properties.getProperty("SUPABASE_PUBLISHABLE_KEY") ?: "",
+)
             } catch (e: Exception) {
                 println("Failed to load secrets from local.properties: ${e.message}")
                 buildConfigField(STRING, "sentryDsn", "")
                 buildConfigField(STRING, "lastfmApiKey", "")
                 buildConfigField(STRING, "lastfmSecret", "")
                 buildConfigField(STRING, "discordClientId", "")
+                buildConfigField(STRING, "supabaseUrl", "")
+                buildConfigField(STRING, "supabasePublishableKey", "")
             }
         } else {
             buildConfigField(STRING, "sentryDsn", "")
@@ -884,6 +898,8 @@ buildkonfig {
             buildConfigField(STRING, "lastfmSecret", "")
             // No Discord application either, so Rich Presence keeps going through kizzy.
             buildConfigField(STRING, "discordClientId", "")
+            buildConfigField(STRING, "supabaseUrl", "")
+            buildConfigField(STRING, "supabasePublishableKey", "")
         }
     }
 }
