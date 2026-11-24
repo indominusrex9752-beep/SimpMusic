@@ -1,10 +1,10 @@
+name: Build SimpMusic Debug Apk V6 (Cloud Sync)
 
-name: Build SimpMusic Debug APK V5 (Insights UI Redesign)
 on:
   workflow_dispatch:
   push:
     branches:
-      - Insights-1
+      - Cloud-Sync
 
 jobs:
   build:
@@ -14,7 +14,7 @@ jobs:
       - name: Checkout SimpMusic
         uses: actions/checkout@v6
         with:
-          ref: Insights-1
+          ref: Cloud-Sync
           submodules: recursive
 
       - name: Use patched core
@@ -37,9 +37,20 @@ jobs:
           distribution: microsoft
           cache: gradle
 
-      - name: Configure build
+      - name: Configure build and Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
         run: |
           echo "isFullBuild=true" >> gradle.properties
+
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "::error::Missing Supabase GitHub secrets."
+            exit 1
+          fi
+
+          printf 'SUPABASE_URL=%s\n' "$SUPABASE_URL" >> local.properties
+          printf 'SUPABASE_PUBLISHABLE_KEY=%s\n' "$SUPABASE_PUBLISHABLE_KEY" >> local.properties
 
       - name: Generate library definitions
         run: ./gradlew exportLibraryDefinitions
@@ -50,5 +61,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: SimpMusic-Patched-Debug
-          path: androidApp/build/outputs/apk/debug/*.apk
+          name: SimpMusic-Cloud-Sync-Debug
+          path: androidApp/build/outputs/apk/debug/*.apkname
