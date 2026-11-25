@@ -58,10 +58,9 @@ diff --git a/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotl
 +    val runs: List<Run?>? = null,
 +    val simpleText: String? = null,
 +)
-+
-@@ -358,29 +359,43 @@
+@@ -358,29 +359,35 @@
  )
-
+ 
  fun AccountSwitcherEndpointResponse.toListAccountInfo(): List<AccountInfo> {
 -    if (this.code == "SUCCESS" && this.data != null) {
 -        val list = mutableListOf<AccountInfo>()
