@@ -71,6 +71,8 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
+            abiFilters.add("x86_64")
+            abiFilters.add("armeabi-v7a")
             abiFilters.add("arm64-v8a")
         }
     }
@@ -102,6 +104,14 @@ android {
             isMinifyEnabled = false
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
+            splits {
+                abi {
+                    isEnable = true
+                    reset()
+                    isUniversalApk = false
+                    include("arm64-v8a")
+                }
+            }
         }
     }
     compileOptions {
