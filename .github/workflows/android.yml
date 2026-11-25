@@ -84,19 +84,23 @@ jobs:
           git apply --check SimpMusic-Cloud-Sync-Verification-Diagnostics.patch
           git apply SimpMusic-Cloud-Sync-Verification-Diagnostics.patch
 
-      - name: Apply V11 Channel Handle Matching
+      - name: Inspect generated Cloud Sync source (diagnostic only)
         run: |
-          test -f SimpMusic-Cloud-Sync-V11-Handle-Matching.patch
-          git apply --check SimpMusic-Cloud-Sync-V11-Handle-Matching.patch
-          git apply SimpMusic-Cloud-Sync-V11-Handle-Matching.patch    
-      
+          echo "===== CloudSyncActivity.kt lines 70-160 after all prior patches ====="
+          nl -ba androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt | sed -n '70,160p'
+          echo "===== Matching account-related declarations ====="
+          grep -nE 'selectedPageId|selectedLiveAccount|youtubeGoogleEmail|selectedHandle|pageId|googleEmail|email' androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
+
       - name: Generate library definitions
+        if: false
         run: ./gradlew exportLibraryDefinitions
 
       - name: Build debug APK
+        if: false
         run: ./gradlew -PisFullBuild=true androidApp:assembleDebug
 
       - name: Upload APK
+        if: false
         uses: actions/upload-artifact@v4
         with:
           name: SimpMusic-Cloud-Sync-Debug
