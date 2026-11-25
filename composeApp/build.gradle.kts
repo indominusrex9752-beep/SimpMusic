@@ -11,11 +11,7 @@ import java.util.Properties
 import java.util.zip.ZipInputStream
 
 val isFullBuild: Boolean =
-    try {
-        extra["isFullBuild"] == "true"
-    } catch (e: Exception) {
-        false
-    }
+    providers.gradleProperty("isFullBuild").orNull == "true"
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
