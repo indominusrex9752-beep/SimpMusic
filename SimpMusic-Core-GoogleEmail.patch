@@ -1,0 +1,102 @@
+diff --git a/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotlinytmusicscraper/models/AccountInfo.kt b/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotlinytmusicscraper/models/AccountInfo.kt
+--- a/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotlinytmusicscraper/models/AccountInfo.kt
++++ b/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotlinytmusicscraper/models/AccountInfo.kt
+@@ -7,4 +7,6 @@
+     val thumbnails: List<Thumbnail>,
+     // `authuser` of the Google account that owns this channel, 0 = first account of the session.
+     val authUser: Int = 0,
++    // Google account email from the account-switcher section header.
++    val googleEmail: String? = null,
+ )
+diff --git a/domain/src/commonMain/kotlin/com/maxrave/domain/data/model/account/AccountInfo.kt b/domain/src/commonMain/kotlin/com/maxrave/domain/data/model/account/AccountInfo.kt
+--- a/domain/src/commonMain/kotlin/com/maxrave/domain/data/model/account/AccountInfo.kt
++++ b/domain/src/commonMain/kotlin/com/maxrave/domain/data/model/account/AccountInfo.kt
+@@ -8,4 +8,5 @@
+     val pageId: String? = null,
+     val thumbnails: List<Thumbnail>,
+     val authUser: Int = 0,
++    val googleEmail: String? = null,
+ )
+\ No newline at end of file
+diff --git a/data/src/commonMain/kotlin/com/maxrave/data/mapping/Mapping.kt b/data/src/commonMain/kotlin/com/maxrave/data/mapping/Mapping.kt
+--- a/data/src/commonMain/kotlin/com/maxrave/data/mapping/Mapping.kt
++++ b/data/src/commonMain/kotlin/com/maxrave/data/mapping/Mapping.kt
+@@ -512,6 +512,7 @@
+         email = this.email,
+         pageId = this.pageId,
+         authUser = this.authUser,
++        googleEmail = this.googleEmail,
+         thumbnails = thumbnails.toListThumbnail(),
+     )
+ 
+diff --git a/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotlinytmusicscraper/models/response/AccountSwitcherEndpointResponse.kt b/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotlinytmusicscraper/models/response/AccountSwitcherEndpointResponse.kt
+--- a/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotlinytmusicscraper/models/response/AccountSwitcherEndpointResponse.kt
++++ b/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotlinytmusicscraper/models/response/AccountSwitcherEndpointResponse.kt
+@@ -186,11 +186,12 @@
+     val serviceEndpoint: AccountItemServiceEndpoint?,
+     val unlimitedStatus: List<AccountItemUnlimitedStatus?>?,
+ ) {
+-    fun toAccountInfo(email: String): AccountInfo? {
++    fun toAccountInfo(email: String, googleEmail: String?): AccountInfo? {
+         val tokens = serviceEndpoint?.selectActiveIdentityEndpoint?.supportedTokens
+         return AccountInfo(
+             name = accountName?.simpleText ?: return null,
+             email = email,
++            googleEmail = googleEmail,
+             pageId =
+                 onBehalfOfParameter
+                     ?: tokens
+@@ -358,29 +359,32 @@
+ )
+ 
+ fun AccountSwitcherEndpointResponse.toListAccountInfo(): List<AccountInfo> {
+-    if (this.code == "SUCCESS" && this.data != null) {
+-        val list = mutableListOf<AccountInfo>()
+-        this.data.contents
+-            ?.firstOrNull()
+-            ?.accountSectionListRenderer
+-            ?.contents
++    if (this.code != "SUCCESS" || this.data == null) return emptyList()
++
++    val accounts = mutableListOf<AccountInfo>()
++    this.data.contents.orEmpty().forEach { section ->
++        val accountSection = section.accountSectionListRenderer ?: return@forEach
++        // YouTube places the owning Google account email in this section header.
++        // It is distinct from each channel's @handle.
++        val googleEmail = accountSection.header
++            ?.googleAccountHeaderRenderer
++            ?.email
++            ?.runs
+             ?.firstOrNull()
+-            ?.accountItemSectionRenderer
+-            ?.contents
+-            ?.forEach { content ->
+-                content?.accountItem?.let { accountItem ->
+-                    accountItem
+-                        .toAccountInfo(
+-                            email =
+-                                accountItem.channelHandle
+-                                    ?.simpleText ?: "",
+-                        )?.let {
+-                            list.add(it)
+-                        }
++            ?.text
++            ?.trim()
++            ?.takeIf { it.contains('@') }
++
++        accountSection.contents.orEmpty().forEach { content ->
++            content?.accountItemSectionRenderer?.contents.orEmpty().forEach { itemContent ->
++                itemContent?.accountItem?.let { item ->
++                    item.toAccountInfo(
++                        email = item.channelHandle?.simpleText.orEmpty(),
++                        googleEmail = googleEmail,
++                    )?.let(accounts::add)
+                 }
+             }
+-        return list
+-    } else {
+-        return emptyList()
++        }
+     }
++    return accounts
+ }

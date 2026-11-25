@@ -1,0 +1,36 @@
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
+--- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
+@@ -114,10 +114,22 @@
+                 val selectedPageId = selectedAccount.pageId?.trim().orEmpty()
+                 if (selectedPageId.isBlank()) {
+                     verificationState.value = "Diagnostic: the selected YouTube account has no page ID, so its Google email cannot be matched safely."
+                     return@launch
+                 }
+                 val selectedLiveAccount = liveAccounts.firstOrNull { it.pageId == selectedPageId }
+                 if (selectedLiveAccount == null) {
+                     verificationState.value = "Diagnostic: the selected YouTube account was not found in the live account list. Refresh the YouTube account selection and try again."
+                     return@launch
+                 }
++                val pageId = selectedAccount.pageId?.trim().orEmpty()
++                fun normalizeChannelHandle(value: String?): String =
++                    value?.trim()?.removePrefix("@")?.lowercase().orEmpty()
++
++                val selectedHandle = normalizeChannelHandle(selectedAccount.email)
++                val selectedLiveAccount = if (pageId.isNotBlank()) {
++                    liveAccounts.filter { it.pageId?.trim() == pageId }.singleOrNull()
++                        ?: liveAccounts.filter {
++                            selectedHandle.isNotBlank() &&
++                                normalizeChannelHandle(it.email) == selectedHandle
++                        }.singleOrNull()
++                } else {
++                    liveAccounts.filter {
++                        selectedHandle.isNotBlank() &&
++                            normalizeChannelHandle(it.email) == selectedHandle
++                    }.singleOrNull()
++                }
++
++                if (selectedLiveAccount == null) {
++                    verificationState.value = "Diagnostic: no unique live YouTube account matched the selected channel handle."
++                    return@launch
++                }
