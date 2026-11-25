@@ -1,17 +1,17 @@
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
-@@ -109,10 +109,22 @@
--                val selectedPageId = selectedAccount.pageId?.trim().orEmpty()
--                if (selectedPageId.isBlank()) {
--                    verificationState.value = "Diagnostic: the selected YouTube account has no page ID, so its Google email cannot be matched safely."
--                    return@launch
--                }
--                val selectedLiveAccount = liveAccounts.firstOrNull { it.pageId == selectedPageId }
--                if (selectedLiveAccount == null) {
--                    verificationState.value = "Diagnostic: the selected YouTube account was not found in the live account list. Refresh the YouTube account selection and try again."
--                    return@launch
--                }
+@@ -114,10 +114,22 @@
+                 val selectedPageId = selectedAccount.pageId?.trim().orEmpty()
+                 if (selectedPageId.isBlank()) {
+                     verificationState.value = "Diagnostic: the selected YouTube account has no page ID, so its Google email cannot be matched safely."
+                     return@launch
+                 }
+                 val selectedLiveAccount = liveAccounts.firstOrNull { it.pageId == selectedPageId }
+                 if (selectedLiveAccount == null) {
+                     verificationState.value = "Diagnostic: the selected YouTube account was not found in the live account list. Refresh the YouTube account selection and try again."
+                     return@launch
+                 }
 +                val pageId = selectedAccount.pageId?.trim().orEmpty()
 +                fun normalizeChannelHandle(value: String?): String =
 +                    value?.trim()?.removePrefix("@")?.lowercase().orEmpty()
