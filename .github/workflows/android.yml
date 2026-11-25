@@ -1,4 +1,4 @@
-name: Build SimpMusic Debug Apk V8 (Cloud Sync Stage-2)
+name: Build SimpMusic Debug Apk V9 (Cloud Sync Stage-3)
 
 on:
   workflow_dispatch:
@@ -50,8 +50,8 @@ jobs:
           fi
 
           printf 'SUPABASE_URL=%s\n' "$SUPABASE_URL" >> local.properties
-          printf 'SUPABASE_PUBLISHABLE_KEY=%s\n' "$SUPABASE_PUBLISHABLE_KEY" >> local.properties 
- 
+          printf 'SUPABASE_PUBLISHABLE_KEY=%s\n' "$SUPABASE_PUBLISHABLE_KEY" >> local.properties
+
       - name: Apply Cloud Sync authentication patch
         run: |
           git apply --check SimpMusic-Cloud-Sync-Auth-Stage1.patch
@@ -60,8 +60,13 @@ jobs:
       - name: Apply Cloud Sync UI patch
         run: |
           git apply --check SimpMusic-Cloud-Sync-Stage2-UI.patch
-          git apply SimpMusic-Cloud-Sync-Stage2-UI.patch   
-      
+          git apply SimpMusic-Cloud-Sync-Stage2-UI.patch
+
+      - name: Apply Cloud Sync Stage 3
+        run: |
+          git apply --check SimpMusic-Cloud-Sync-Stage3.patch
+          git apply SimpMusic-Cloud-Sync-Stage3.patch
+
       - name: Generate library definitions
         run: ./gradlew exportLibraryDefinitions
 
