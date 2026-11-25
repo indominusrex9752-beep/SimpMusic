@@ -46,9 +46,17 @@ diff --git a/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotl
              pageId =
                  onBehalfOfParameter
                      ?: tokens
-@@ -358,29 +359,32 @@
+@@ -358,29 +359,43 @@
  )
  
++// YouTube's account switcher returns the Google email as simpleText in
++// googleAccountHeaderRenderer.email. Some response variants use runs instead.
++@Serializable
++data class GoogleAccountEmail(
++    val runs: List<Run?>? = null,
++    val simpleText: String? = null,
++)
++
  fun AccountSwitcherEndpointResponse.toListAccountInfo(): List<AccountInfo> {
 -    if (this.code == "SUCCESS" && this.data != null) {
 -        val list = mutableListOf<AccountInfo>()
@@ -56,18 +64,7 @@ diff --git a/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotl
 -            ?.firstOrNull()
 -            ?.accountSectionListRenderer
 -            ?.contents
-+    if (this.code != "SUCCESS" || this.data == null) return emptyList()
-+
-+    val accounts = mutableListOf<AccountInfo>()
-+    this.data.contents.orEmpty().forEach { section ->
-+        val accountSection = section.accountSectionListRenderer ?: return@forEach
-+        // YouTube places the owning Google account email in this section header.
-+        // It is distinct from each channel's @handle.
-+        val googleEmail = accountSection.header
-+            ?.googleAccountHeaderRenderer
-+            ?.email
-+            ?.runs
-             ?.firstOrNull()
+-            ?.firstOrNull()
 -            ?.accountItemSectionRenderer
 -            ?.contents
 -            ?.forEach { content ->
@@ -80,9 +77,30 @@ diff --git a/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotl
 -                        )?.let {
 -                            list.add(it)
 -                        }
-+            ?.text
-+            ?.trim()
-+            ?.takeIf { it.contains('@') }
+-                }
+-            }
+-        return list
+-    } else {
+-        return emptyList()
+-    }
++    if (this.code != "SUCCESS" || this.data == null) return emptyList()
++
++    // The live response nests accountSectionListRenderer under
++    // data.actions[].getMultiPageMenuAction.menu.multiPageMenuRenderer.sections[].
++    // data.contents is retained as a fallback for older response variants.
++    val menuSections = this.data.actions.orEmpty().flatMap { action ->
++        action?.getMultiPageMenuAction?.menu?.multiPageMenuRenderer?.sections.orEmpty()
++    }.filterNotNull()
++    val sections = menuSections.ifEmpty { this.data.contents.orEmpty() }
++
++    val accounts = mutableListOf<AccountInfo>()
++    sections.forEach { section ->
++        val accountSection = section.accountSectionListRenderer ?: return@forEach
++        val emailRenderer = accountSection.header?.googleAccountHeaderRenderer?.email
++        val googleEmail = (
++            emailRenderer?.simpleText
++                ?: emailRenderer?.runs.orEmpty().filterNotNull().joinToString("") { it.text }
++        ).trim().takeIf { it.contains('@') }
 +
 +        accountSection.contents.orEmpty().forEach { content ->
 +            content?.accountItemSectionRenderer?.contents.orEmpty().forEach { itemContent ->
@@ -91,12 +109,9 @@ diff --git a/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotl
 +                        email = item.channelHandle?.simpleText.orEmpty(),
 +                        googleEmail = googleEmail,
 +                    )?.let(accounts::add)
-                 }
-             }
--        return list
--    } else {
--        return emptyList()
++                }
++            }
 +        }
-     }
++    }
 +    return accounts
  }
