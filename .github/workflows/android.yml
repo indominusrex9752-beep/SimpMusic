@@ -1,5 +1,5 @@
 
-name: Build SimpMusic Debug Apk V12 (ARM64 Only APK)
+name: Build SimpMusic Debug Apk V11 (Cloud Sync Account Matching)
 
 on:
   workflow_dispatch:
