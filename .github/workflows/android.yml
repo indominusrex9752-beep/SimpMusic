@@ -86,9 +86,54 @@ jobs:
 
       - name: Apply V11 Channel Handle Matching
         run: |
-          test -f SimpMusic-Cloud-Sync-V11-Handle-Matching.patch
-          git apply --check SimpMusic-Cloud-Sync-V11-Handle-Matching.patch
-          git apply SimpMusic-Cloud-Sync-V11-Handle-Matching.patch
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path("androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt")
+          content = source.read_text()
+
+          old = """                val selectedPageId = selectedAccount.pageId?.trim().orEmpty()
+                if (selectedPageId.isBlank()) {
+                    verificationState.value = "Diagnostic: the selected YouTube account has no page ID, so its Google email cannot be matched safely."
+                    return@launch
+                }
+                val selectedLiveAccount = liveAccounts.firstOrNull { it.pageId == selectedPageId }
+                if (selectedLiveAccount == null) {
+                    verificationState.value = "Diagnostic: the selected YouTube account was not found in the live account list. Refresh the YouTube account selection and try again."
+                    return@launch
+                }"""
+
+          new = """                val selectedPageId = selectedAccount.pageId?.trim().orEmpty()
+                fun normalizeChannelHandle(value: String?): String =
+                    value?.trim()?.removePrefix("@")?.lowercase().orEmpty()
+
+                val selectedHandle = normalizeChannelHandle(selectedAccount.email)
+                val selectedLiveAccount = if (selectedPageId.isNotBlank()) {
+                    liveAccounts.firstOrNull { it.pageId?.trim() == selectedPageId }
+                        ?: liveAccounts.filter {
+                            selectedHandle.isNotBlank() &&
+                                normalizeChannelHandle(it.email) == selectedHandle
+                        }.singleOrNull()
+                } else {
+                    liveAccounts.filter {
+                        selectedHandle.isNotBlank() &&
+                            normalizeChannelHandle(it.email) == selectedHandle
+                    }.singleOrNull()
+                }
+
+                if (selectedLiveAccount == null) {
+                    verificationState.value = "Diagnostic: no unique live YouTube account matched the selected channel handle."
+                    return@launch
+                }"""
+
+          count = content.count(old)
+          if count != 1:
+              raise SystemExit(f"Expected exactly one original account-matching block, found {count}; refusing to modify source.")
+          source.write_text(content.replace(old, new, 1))
+          print("V11 account-matching replacement applied exactly once.")
+          PY
+          git diff --check
+          git diff -- androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
 
       - name: Generate library definitions
         run: ./gradlew exportLibraryDefinitions
