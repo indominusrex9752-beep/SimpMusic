@@ -1,5 +1,5 @@
 
-name: Build SimpMusic Debug Apk V11 (Cloud Sync Account Matching)
+name: Build SimpMusic Debug APK V12 (SimpCloud Google Account Sync)
 
 on:
   workflow_dispatch:
@@ -23,11 +23,6 @@ jobs:
           git submodule set-url core https://github.com/indominusrex9752-beep/core.git
           git -C core fetch origin patch-1
           git -C core checkout FETCH_HEAD
-
-      - name: Apply Core Google Email Fix
-        run: |
-          git -C core apply --check "$GITHUB_WORKSPACE/SimpMusic-Core-GoogleEmail.patch"
-          git -C core apply "$GITHUB_WORKSPACE/SimpMusic-Core-GoogleEmail.patch"
 
       - name: Apply SimpMusic Insights patch
         run: |
@@ -58,76 +53,15 @@ jobs:
           printf 'SUPABASE_URL=%s\n' "$SUPABASE_URL" >> local.properties
           printf 'SUPABASE_PUBLISHABLE_KEY=%s\n' "$SUPABASE_PUBLISHABLE_KEY" >> local.properties
 
-      - name: Apply Cloud Sync authentication patch
+      - name: Apply SimpCloud Google OAuth foundation
         run: |
           git apply --check SimpMusic-Cloud-Sync-Auth-Stage1.patch
           git apply SimpMusic-Cloud-Sync-Auth-Stage1.patch
 
-      - name: Apply Cloud Sync UI patch
+      - name: Apply SimpCloud Sync interface
         run: |
           git apply --check SimpMusic-Cloud-Sync-Stage2-UI.patch
           git apply SimpMusic-Cloud-Sync-Stage2-UI.patch
-
-      - name: Apply Cloud Sync Stage 3
-        run: |
-          git apply --check SimpMusic-Cloud-Sync-Stage3.patch
-          git apply SimpMusic-Cloud-Sync-Stage3.patch
-
-      - name: Apply Stage 3 Verification Fix
-        run: |
-          git apply --check SimpMusic-Cloud-Sync-Stage3-Fix.patch
-          git apply SimpMusic-Cloud-Sync-Stage3-Fix.patch
-
-      - name: Apply Verification Diagnostics
-        run: |
-          test -f SimpMusic-Cloud-Sync-Verification-Diagnostics.patch
-          git apply --check SimpMusic-Cloud-Sync-Verification-Diagnostics.patch
-          git apply SimpMusic-Cloud-Sync-Verification-Diagnostics.patch
-
-      - name: Apply V11 Channel Handle Matching
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          source = Path("androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt")
-          lines = source.read_text().splitlines(keepends=True)
-
-          starts = [i for i, line in enumerate(lines) if line.strip() == "val selectedPageId = selectedAccount.pageId?.trim().orEmpty()"]
-          ends = [i for i, line in enumerate(lines) if line.strip() == "val youtubeGoogleEmail = selectedLiveAccount.googleEmail?.trim().orEmpty()"]
-          if len(starts) != 1 or len(ends) != 1 or starts[0] >= ends[0]:
-              raise SystemExit(f"Expected one ordered pair of account-matching anchors; starts={len(starts)}, ends={len(ends)}. No source changed.")
-
-          replacement = [
-              "                val selectedPageId = selectedAccount.pageId?.trim().orEmpty()\n",
-              "                fun normalizeChannelHandle(value: String?): String =\n",
-              "                    value?.trim()?.removePrefix(\"@\")?.lowercase().orEmpty()\n",
-              "\n",
-              "                val selectedHandle = normalizeChannelHandle(selectedAccount.email)\n",
-              "                val selectedLiveAccount = if (selectedPageId.isNotBlank()) {\n",
-              "                    liveAccounts.firstOrNull { it.pageId?.trim() == selectedPageId }\n",
-              "                        ?: liveAccounts.filter {\n",
-              "                            selectedHandle.isNotBlank() &&\n",
-              "                                normalizeChannelHandle(it.email) == selectedHandle\n",
-              "                        }.singleOrNull()\n",
-              "                } else {\n",
-              "                    liveAccounts.filter {\n",
-              "                        selectedHandle.isNotBlank() &&\n",
-              "                            normalizeChannelHandle(it.email) == selectedHandle\n",
-              "                    }.singleOrNull()\n",
-              "                }\n",
-              "\n",
-              "                if (selectedLiveAccount == null) {\n",
-              "                    verificationState.value = \"Diagnostic: no unique live YouTube account matched the selected channel handle.\"\n",
-              "                    return@launch\n",
-              "                }\n",
-              "\n",
-          ]
-
-          source.write_text("".join(lines[:starts[0]] + replacement + lines[ends[0]:]))
-          print("V11 account-matching block replaced between verified source anchors.")
-          PY
-          git diff --check
-          git diff -- androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
 
       - name: Generate library definitions
         run: ./gradlew exportLibraryDefinitions

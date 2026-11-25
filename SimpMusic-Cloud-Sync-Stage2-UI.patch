@@ -150,7 +150,7 @@ index 0000000..684e905
 +            Row(verticalAlignment = Alignment.CenterVertically) {
 +                OutlinedButton(onClick = onBack) { Text("Back") }
 +                Spacer(Modifier.width(12.dp))
-+                Text("Cloud Sync", style = MaterialTheme.typography.headlineSmall)
++                Text("SimpCloud Sync", style = MaterialTheme.typography.headlineSmall)
 +            }
 +
 +            Text(
@@ -175,7 +175,7 @@ index 0000000..684e905
 +                        Text(emailState.value.orEmpty(), style = MaterialTheme.typography.bodyMedium)
 +                    } else {
 +                        Text(
-+                            "Sign in to establish your Cloud Sync identity.",
++                            "Sign in to establish your SimpCloud identity.",
 +                            style = MaterialTheme.typography.bodyMedium,
 +                            color = MaterialTheme.colorScheme.onSurfaceVariant,
 +                        )
@@ -252,7 +252,7 @@ index 0000000..684e905
 +                ) {
 +                    Text("What happens next", style = MaterialTheme.typography.titleMedium)
 +                    Text(
-+                        "This stage connects your Google identity. Before sync is enabled, this account will be checked against your selected YouTube account. Listening history, Insights, audio effects and app settings will be synchronized in a later stage.",
++                        "Your SimpCloud identity is based only on the Google account connected here. Your YouTube Music sign-in is independent. Listening history, Insights, audio effects and app settings will be synchronized in a later stage.",
 +                        style = MaterialTheme.typography.bodyMedium,
 +                        color = MaterialTheme.colorScheme.onSurfaceVariant,
 +                    )
@@ -312,8 +312,8 @@ index 2c17b7c..da622f0 100644
                      },
                  )
 +                SettingItem(
-+                    title = "Cloud Sync",
-+                    subtitle = "Connect your account to sync SimpMusic across devices",
++                    title = "SimpCloud Sync",
++                    subtitle = "Connect your Google account for SimpCloud Sync",
 +                    onClick = { openCloudSyncSettings() },
 +                )
                  SettingItem(
