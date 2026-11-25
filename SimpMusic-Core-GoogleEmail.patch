@@ -46,18 +46,23 @@ diff --git a/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotl
              pageId =
                  onBehalfOfParameter
                      ?: tokens
-@@ -358,29 +359,43 @@
+@@ -326,7 +326,8 @@
+ data class GoogleAccountHeaderRenderer(
+     val email: GoogleAccountEmail?,
+     val name: GoogleAccountName?,
  )
  
-+// YouTube's account switcher returns the Google email as simpleText in
-+// googleAccountHeaderRenderer.email. Some response variants use runs instead.
-+@Serializable
-+data class GoogleAccountEmail(
+ @Serializable
+ data class GoogleAccountEmail(
+-    val runs: List<Run?>?,
 +    val runs: List<Run?>? = null,
 +    val simpleText: String? = null,
 +)
 +
- fun AccountSwitcherEndpointResponse.toListAccountInfo(): List<AccountInfo> {
++@@ -358,29 +359,43 @@
++ )
++
++ fun AccountSwitcherEndpointResponse.toListAccountInfo(): List<AccountInfo> {
 -    if (this.code == "SUCCESS" && this.data != null) {
 -        val list = mutableListOf<AccountInfo>()
 -        this.data.contents
