@@ -1,3 +1,4 @@
+
 name: Build SimpMusic Debug Apk V9 (Cloud Sync Stage-3)
 
 on:
@@ -22,6 +23,11 @@ jobs:
           git submodule set-url core https://github.com/indominusrex9752-beep/core.git
           git -C core fetch origin patch-1
           git -C core checkout FETCH_HEAD
+
+      - name: Apply Core Google Email Fix
+        run: |
+          git -C core apply --check "$GITHUB_WORKSPACE/SimpMusic-Core-GoogleEmail.patch"
+          git -C core apply "$GITHUB_WORKSPACE/SimpMusic-Core-GoogleEmail.patch"
 
       - name: Apply SimpMusic Insights patch
         run: |
@@ -67,6 +73,11 @@ jobs:
           git apply --check SimpMusic-Cloud-Sync-Stage3.patch
           git apply SimpMusic-Cloud-Sync-Stage3.patch
 
+      - name: Apply Stage 3 Verification Fix
+        run: |
+          git apply --check SimpMusic-Cloud-Sync-Stage3-Fix.patch
+          git apply SimpMusic-Cloud-Sync-Stage3-Fix.patch
+
       - name: Generate library definitions
         run: ./gradlew exportLibraryDefinitions
 
@@ -80,4 +91,4 @@ jobs:
           path: androidApp/build/outputs/apk/debug/*arm64-v8a*.apk
           if-no-files-found: error
           compression-level: 0
-
+          
