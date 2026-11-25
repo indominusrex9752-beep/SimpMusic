@@ -1,0 +1,35 @@
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
+@@ -1,15 +1,27 @@
+                 val pageId = selectedAccount.pageId?.trim().orEmpty()
++                fun normalizeChannelHandle(value: String?): String =
++                    value?.trim()?.removePrefix("@")?.lowercase().orEmpty()
++
++                val selectedHandle = normalizeChannelHandle(selectedAccount.email)
+                 val selectedLiveAccount = if (pageId.isNotBlank()) {
+-                    liveAccounts.firstOrNull { it.pageId?.trim() == pageId }
++                    liveAccounts.filter { it.pageId?.trim() == pageId }.singleOrNull()
++                        ?: liveAccounts.filter {
++                            selectedHandle.isNotBlank() &&
++                                normalizeChannelHandle(it.email) == selectedHandle
++                        }.singleOrNull()
+                 } else {
+-                    liveAccounts.filter { it.authUser == selectedAccount.authUser }.singleOrNull()
++                    liveAccounts.filter {
++                        selectedHandle.isNotBlank() &&
++                            normalizeChannelHandle(it.email) == selectedHandle
++                    }.singleOrNull()
+                 }
+ 
+                 if (selectedLiveAccount == null) {
+-                    verificationState.value = if (pageId.isNotBlank()) {
+-                        "Diagnostic: YouTube returned ${liveAccounts.size} account entries, but none matched the selected channel pageId."
+-                    } else {
+-                        "Diagnostic: selected channel has no pageId and its authUser did not identify exactly one account entry."
++                    verificationState.value = when {
++                        selectedHandle.isBlank() ->
++                            "Diagnostic: the selected YouTube account has neither a page ID nor a channel handle available for safe matching."
++                        else ->
++                            "Diagnostic: no unique live YouTube account matched the selected channel handle."
+                     }
+                     return@launch
+                 }
