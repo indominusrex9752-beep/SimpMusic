@@ -90,47 +90,41 @@ jobs:
           from pathlib import Path
 
           source = Path("androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt")
-          content = source.read_text()
+          lines = source.read_text().splitlines(keepends=True)
 
-          old = """                val selectedPageId = selectedAccount.pageId?.trim().orEmpty()
-                if (selectedPageId.isBlank()) {
-                    verificationState.value = "Diagnostic: the selected YouTube account has no page ID, so its Google email cannot be matched safely."
-                    return@launch
-                }
-                val selectedLiveAccount = liveAccounts.firstOrNull { it.pageId == selectedPageId }
-                if (selectedLiveAccount == null) {
-                    verificationState.value = "Diagnostic: the selected YouTube account was not found in the live account list. Refresh the YouTube account selection and try again."
-                    return@launch
-                }"""
+          starts = [i for i, line in enumerate(lines) if line.strip() == "val selectedPageId = selectedAccount.pageId?.trim().orEmpty()"]
+          ends = [i for i, line in enumerate(lines) if line.strip() == "val youtubeGoogleEmail = selectedLiveAccount.googleEmail?.trim().orEmpty()"]
+          if len(starts) != 1 or len(ends) != 1 or starts[0] >= ends[0]:
+              raise SystemExit(f"Expected one ordered pair of account-matching anchors; starts={len(starts)}, ends={len(ends)}. No source changed.")
 
-          new = """                val selectedPageId = selectedAccount.pageId?.trim().orEmpty()
-                fun normalizeChannelHandle(value: String?): String =
-                    value?.trim()?.removePrefix("@")?.lowercase().orEmpty()
+          replacement = [
+              "                val selectedPageId = selectedAccount.pageId?.trim().orEmpty()\n",
+              "                fun normalizeChannelHandle(value: String?): String =\n",
+              "                    value?.trim()?.removePrefix(\"@\")?.lowercase().orEmpty()\n",
+              "\n",
+              "                val selectedHandle = normalizeChannelHandle(selectedAccount.email)\n",
+              "                val selectedLiveAccount = if (selectedPageId.isNotBlank()) {\n",
+              "                    liveAccounts.firstOrNull { it.pageId?.trim() == selectedPageId }\n",
+              "                        ?: liveAccounts.filter {\n",
+              "                            selectedHandle.isNotBlank() &&\n",
+              "                                normalizeChannelHandle(it.email) == selectedHandle\n",
+              "                        }.singleOrNull()\n",
+              "                } else {\n",
+              "                    liveAccounts.filter {\n",
+              "                        selectedHandle.isNotBlank() &&\n",
+              "                            normalizeChannelHandle(it.email) == selectedHandle\n",
+              "                    }.singleOrNull()\n",
+              "                }\n",
+              "\n",
+              "                if (selectedLiveAccount == null) {\n",
+              "                    verificationState.value = \"Diagnostic: no unique live YouTube account matched the selected channel handle.\"\n",
+              "                    return@launch\n",
+              "                }\n",
+              "\n",
+          ]
 
-                val selectedHandle = normalizeChannelHandle(selectedAccount.email)
-                val selectedLiveAccount = if (selectedPageId.isNotBlank()) {
-                    liveAccounts.firstOrNull { it.pageId?.trim() == selectedPageId }
-                        ?: liveAccounts.filter {
-                            selectedHandle.isNotBlank() &&
-                                normalizeChannelHandle(it.email) == selectedHandle
-                        }.singleOrNull()
-                } else {
-                    liveAccounts.filter {
-                        selectedHandle.isNotBlank() &&
-                            normalizeChannelHandle(it.email) == selectedHandle
-                    }.singleOrNull()
-                }
-
-                if (selectedLiveAccount == null) {
-                    verificationState.value = "Diagnostic: no unique live YouTube account matched the selected channel handle."
-                    return@launch
-                }"""
-
-          count = content.count(old)
-          if count != 1:
-              raise SystemExit(f"Expected exactly one original account-matching block, found {count}; refusing to modify source.")
-          source.write_text(content.replace(old, new, 1))
-          print("V11 account-matching replacement applied exactly once.")
+          source.write_text("".join(lines[:starts[0]] + replacement + lines[ends[0]:]))
+          print("V11 account-matching block replaced between verified source anchors.")
           PY
           git diff --check
           git diff -- androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
