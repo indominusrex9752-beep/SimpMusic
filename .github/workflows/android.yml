@@ -66,9 +66,8 @@ jobs:
         run: ./gradlew exportLibraryDefinitions
 
       - name: Build debug APK
-        run: ./gradlew androidApp:assembleDebug
+        run: ./gradlew -PisFullBuild=true androidApp:assembleDebug
 
-      
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
