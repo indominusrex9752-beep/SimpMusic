@@ -59,7 +59,7 @@ diff --git a/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotl
 +    val simpleText: String? = null,
 +)
 +
-@@ -360,29 +361,43 @@
+@@ -358,29 +359,43 @@
  )
 
  fun AccountSwitcherEndpointResponse.toListAccountInfo(): List<AccountInfo> {
