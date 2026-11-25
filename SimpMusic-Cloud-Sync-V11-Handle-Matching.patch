@@ -1,7 +1,12 @@
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
-@@ -109,10 +109,19 @@
+@@ -1,23 +1,32 @@
+                 if (liveAccounts.isEmpty()) {
+                     verificationState.value = "Diagnostic: YouTube returned no account details. Check the connection and sign-in session."
+                     return@launch
+                 }
+ 
 -                val selectedPageId = selectedAccount.pageId?.trim().orEmpty()
 -                if (selectedPageId.isBlank()) {
 -                    verificationState.value = "Diagnostic: the selected YouTube account has no page ID, so its Google email cannot be matched safely."
@@ -34,3 +39,5 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
 +                    verificationState.value = "Diagnostic: no unique live YouTube account matched the selected channel handle."
 +                    return@launch
 +                }
+ 
+                 val youtubeGoogleEmail = selectedLiveAccount.googleEmail?.trim().orEmpty()
