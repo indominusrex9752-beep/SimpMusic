@@ -57,7 +57,7 @@ diff --git a/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotl
 -    val runs: List<Run?>?,
 +    val runs: List<Run?>? = null,
 +    val simpleText: String? = null,
-+)
+ )
 @@ -358,29 +359,35 @@
  )
  
