@@ -1,5 +1,5 @@
 
-name: Build SimpMusic Debug Apk V10 (Cloud Sync Diagnostics)
+name: Build SimpMusic Debug Apk V11 (Cloud Sync Account Matching)
 
 on:
   workflow_dispatch:
@@ -83,6 +83,12 @@ jobs:
           test -f SimpMusic-Cloud-Sync-Verification-Diagnostics.patch
           git apply --check SimpMusic-Cloud-Sync-Verification-Diagnostics.patch
           git apply SimpMusic-Cloud-Sync-Verification-Diagnostics.patch
+
+      - name: Apply V11 Channel Handle Matching
+        run: |
+          test -f SimpMusic-Cloud-Sync-V11-Handle-Matching.patch
+          git apply --check SimpMusic-Cloud-Sync-V11-Handle-Matching.patch
+          git apply SimpMusic-Cloud-Sync-V11-Handle-Matching.patch    
       
       - name: Generate library definitions
         run: ./gradlew exportLibraryDefinitions
