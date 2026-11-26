@@ -265,7 +265,7 @@ new file mode 100644
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncModule.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncModule.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncModule.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncModule.kt
-@@ -1,10 +1,13 @@
+@@ -1,11 +1,14 @@
  package com.maxrave.simpmusic.cloudsync
  
 +import androidx.datastore.core.DataStore
@@ -277,6 +277,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncM
  val cloudSyncModule = module {
      single { CloudSyncAuth() }
      single { CloudSyncPlaybackSync(androidContext(), get(), get<SyncDao>()) }
+     single<CloudSyncManualSync> { CloudSyncAutoSync(androidContext()) }
 +    single { CloudSyncSettingsSync(androidContext(), get(), get<DataStore<Preferences>>()) }
  }
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
