@@ -42,115 +42,31 @@ diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/cloudsync/Cl
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
-@@ -1,57 +1,87 @@
--package com.maxrave.simpmusic.cloudsync
--
--import android.content.Context
--import androidx.work.Constraints
--import androidx.work.CoroutineWorker
--import androidx.work.ExistingWorkPolicy
--import androidx.work.NetworkType
--import androidx.work.OneTimeWorkRequestBuilder
--import androidx.work.WorkManager
--import androidx.work.WorkerParameters
--import org.koin.core.component.KoinComponent
--import org.koin.core.component.inject
--
--class CloudSyncWorker(
--    context: Context,
--    parameters: WorkerParameters,
--) : CoroutineWorker(context, parameters), KoinComponent {
--    private val playbackSync: CloudSyncPlaybackSync by inject()
--
--    override suspend fun doWork(): Result =
--        try {
--            playbackSync.syncNow()
--            Result.success()
--        } catch (error: Exception) {
--            if (runAttemptCount < 5) Result.retry() else Result.failure()
--        }
--}
--
--class CloudSyncAutoSync(context: Context) : CloudSyncManualSync {
--    private val workManager = WorkManager.getInstance(context.applicationContext)
--    private val network = Constraints.Builder()
--        .setRequiredNetworkType(NetworkType.CONNECTED)
--        .build()
--
--    fun scheduleLaunchSync() = enqueueSync()
--
--    fun schedulePlaybackSync() = enqueueSync()
--
--    fun scheduleRealtimeSync() = enqueueSync()
--
--    override fun scheduleManualSync() = enqueueSync()
--
--    private fun enqueueSync() {
--        val request = OneTimeWorkRequestBuilder<CloudSyncWorker>()
--            .setConstraints(network)
--            .build()
--        workManager.enqueueUniqueWork(
--            SYNC_WORK,
--            ExistingWorkPolicy.APPEND_OR_REPLACE,
--            request,
--        )
--    }
--
--    private companion object {
--        const val SYNC_WORK = "simpcloud_sync"
--    }
--}
-+package com.maxrave.simpmusic.cloudsync
-+
-+import android.content.Context
-+import androidx.work.Constraints
-+import androidx.work.CoroutineWorker
-+import androidx.work.ExistingWorkPolicy
-+import androidx.work.NetworkType
-+import androidx.work.OneTimeWorkRequestBuilder
-+import androidx.work.WorkManager
-+import androidx.work.WorkerParameters
+@@ -10,6 +10,13 @@ import androidx.work.OneTimeWorkRequestBuilder
+ import androidx.work.WorkManager
+ import androidx.work.WorkerParameters
 +import kotlinx.coroutines.CancellationException
 +import kotlinx.coroutines.CoroutineScope
 +import kotlinx.coroutines.Dispatchers
 +import kotlinx.coroutines.SupervisorJob
 +import kotlinx.coroutines.launch
 +import java.util.concurrent.atomic.AtomicBoolean
-+import org.koin.core.component.KoinComponent
-+import org.koin.core.component.inject
-+
-+class CloudSyncWorker(
-+    context: Context,
-+    parameters: WorkerParameters,
-+) : CoroutineWorker(context, parameters), KoinComponent {
-+    private val playbackSync: CloudSyncPlaybackSync by inject()
-+
-+    override suspend fun doWork(): Result =
-+        try {
-+            playbackSync.syncNow()
-+            Result.success()
-+        } catch (error: Exception) {
-+            if (runAttemptCount < 5) Result.retry() else Result.failure()
-+        }
-+}
-+
+ import org.koin.core.component.KoinComponent
+ import org.koin.core.component.inject
+@@ -30,7 +37,12 @@ class CloudSyncWorker(
+-class CloudSyncAutoSync(context: Context) : CloudSyncManualSync {
 +class CloudSyncAutoSync(context: Context) : CloudSyncManualSync, KoinComponent {
 +    private val playbackSync: CloudSyncPlaybackSync by inject()
-+    private val workManager = WorkManager.getInstance(context.applicationContext)
-+    private val network = Constraints.Builder()
-+        .setRequiredNetworkType(NetworkType.CONNECTED)
-+        .build()
+     private val workManager = WorkManager.getInstance(context.applicationContext)
 +    private val manualSyncInProgress = AtomicBoolean(false)
 +    private val manualSyncScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-+
-+    fun scheduleLaunchSync() = enqueueSync()
-+
-+    fun schedulePlaybackSync() = enqueueSync()
-+
-+    fun scheduleRealtimeSync() = enqueueSync()
-+
-+    override fun scheduleManualSync() = enqueueSync()
-+
+     private val network = Constraints.Builder()
+         .setRequiredNetworkType(NetworkType.CONNECTED)
+         .build()
+@@ -42,6 +54,25 @@ class CloudSyncAutoSync(context: Context) : CloudSyncManualSync {
+ 
+     override fun scheduleManualSync() = enqueueSync()
+ 
 +    override fun syncManual(onStatus: (String) -> Unit) {
 +        if (!manualSyncInProgress.compareAndSet(false, true)) {
 +            onStatus("A SimpCloud sync is already running.")
@@ -172,21 +88,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
 +        }
 +    }
 +
-+    private fun enqueueSync() {
-+        val request = OneTimeWorkRequestBuilder<CloudSyncWorker>()
-+            .setConstraints(network)
-+            .build()
-+        workManager.enqueueUniqueWork(
-+            SYNC_WORK,
-+            ExistingWorkPolicy.APPEND_OR_REPLACE,
-+            request,
-+        )
-+    }
-+
-+    private companion object {
-+        const val SYNC_WORK = "simpcloud_sync"
-+    }
-+}
+     private fun enqueueSync() {
 diff --git a/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.android.kt b/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.android.kt
 --- a/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.android.kt
 +++ b/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.android.kt
