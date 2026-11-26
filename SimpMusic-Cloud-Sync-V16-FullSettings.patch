@@ -2,7 +2,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncS
 new file mode 100644
 --- /dev/null
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncSettingsSync.kt
-@@ -0,0 +1,257 @@
+@@ -0,0 +1,258 @@
 +package com.maxrave.simpmusic.cloudsync
 +
 +import android.content.Context
@@ -20,7 +20,7 @@ new file mode 100644
 +import kotlinx.coroutines.sync.Mutex
 +import kotlinx.coroutines.sync.withLock
 +import kotlinx.coroutines.withContext
-import kotlinx.coroutines.flow.first
++import kotlinx.coroutines.flow.first
 +import org.json.JSONArray
 +import org.json.JSONObject
 +import java.io.IOException
