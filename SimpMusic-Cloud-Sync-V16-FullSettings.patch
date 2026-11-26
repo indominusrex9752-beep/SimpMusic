@@ -109,7 +109,23 @@ new file mode 100644
 +        }
 +    }
 +
-+    private suspend fun snapshot(category: String): JSONObject {
++    fun observeChanges(scope: CoroutineScope, onChanged: () -> Unit) {
+        scope.launch {
+            dataStore.data
+                .map { preferences ->
+                    preferences.asMap().entries
+                        .filter { it.key.name in ALL_KEYS }
+                        .sortedBy { it.key.name }
+                        .joinToString("|") { "${it.key.name}=${it.value}" }
+                }
+                .distinctUntilChanged()
+                .drop(1)
+                .debounce(2_500)
+                .collect { onChanged() }
+        }
+    }
+
+    private suspend fun snapshot(category: String): JSONObject {
 +        val values = dataStore.dataSnapshot()
 +        val result = JSONObject()
 +        values.asMap().entries
@@ -299,9 +315,8 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
      private val playbackSync: CloudSyncPlaybackSync by inject()
 +    private val settingsSync: CloudSyncSettingsSync by inject()
      private val workManager = WorkManager.getInstance(context.applicationContext)
-@@ -54,2 +57,6 @@ class CloudSyncAutoSync(context: Context) : CloudSyncManualSync, KoinComponent {
+@@ -54,1 +57,5 @@ class CloudSyncAutoSync(context: Context) : CloudSyncManualSync, KoinComponent {
      override fun scheduleManualSync() = enqueueSync()
- 
 +    fun observeSettings(scope: CoroutineScope) {
 +        settingsSync.observeChanges(scope) { enqueueSync() }
 +    }
