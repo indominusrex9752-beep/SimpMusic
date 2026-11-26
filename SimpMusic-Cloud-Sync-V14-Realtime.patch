@@ -209,7 +209,7 @@ diff --git a/composeApp/src/jvmMain/kotlin/com/maxrave/simpmusic/expect/CloudSyn
 new file mode 100644
 --- /dev/null
 +++ b/composeApp/src/jvmMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.jvm.kt
-@@ -0,0 +1,5 @@
+@@ -0,0 +1,4 @@
 +package com.maxrave.simpmusic.expect
 +
 +actual fun requestManualCloudSync() = Unit
