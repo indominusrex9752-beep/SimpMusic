@@ -1,7 +1,7 @@
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
-@@ -57,12 +57,26 @@
+@@ -57,12 +57,27 @@
      fun authenticatedEmail(): String? =
          if (isConfigured) client.auth.currentUserOrNull()?.email else null
  
