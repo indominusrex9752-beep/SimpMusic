@@ -324,7 +324,7 @@ new file mode 100644
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
-@@ -35,175 +35,202 @@
+@@ -35,176 +35,203 @@
  
  class CloudSyncActivity : AppCompatActivity() {
      private val cloudSyncAuth: CloudSyncAuth by inject()
