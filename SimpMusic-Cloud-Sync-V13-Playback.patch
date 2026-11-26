@@ -60,7 +60,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncP
 new file mode 100644
 --- /dev/null
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncPlaybackSync.kt
-@@ -0,0 +1,260 @@
+@@ -0,0 +1,264 @@
 +package com.maxrave.simpmusic.cloudsync
 +
 +import android.content.Context
@@ -100,7 +100,7 @@ new file mode 100644
 +        val deviceKey = deviceKey()
 +        val deviceCreatedAt = registerDevice(credentials.userId, credentials.accessToken, deviceKey)
 +        val from = Instant.fromEpochMilliseconds(
-+            JavaInstant.parse(deviceCreatedAt).toEpochMilli(),
++            parseServerInstant(deviceCreatedAt).toEpochMilli(),
 +        ).toLocalDateTime(TimeZone.UTC)
 +
 +        // Assign stable IDs only to previously untagged local events from this device's cloud-link date.
@@ -157,7 +157,7 @@ new file mode 100644
 +                newestCursor = newerCursor(newestCursor, row.getString("created_at"))
 +                if (row.getString("device_key") == deviceKey) continue
 +
-+                val playedAt = JavaInstant.parse(row.getString("played_at")).toEpochMilli()
++                val playedAt = parseServerInstant(row.getString("played_at")).toEpochMilli()
 +                val timestamp = Instant.fromEpochMilliseconds(playedAt).toLocalDateTime(TimeZone.UTC)
 +                val artistArray = row.optJSONArray("artist_ids") ?: JSONArray()
 +                val artists = buildList {
@@ -311,8 +311,11 @@ new file mode 100644
 +
 +    private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
 +
++    private fun parseServerInstant(value: String): JavaInstant =
++        JavaInstant.parse(if (value.endsWith("+00:00")) value.dropLast(6) + "Z" else value)
++
 +    private fun newerCursor(current: String?, candidate: String): String =
-+        if (current == null || JavaInstant.parse(candidate).isAfter(JavaInstant.parse(current))) candidate
++        if (current == null || parseServerInstant(candidate).isAfter(parseServerInstant(current))) candidate
 +        else current
 +
 +    private companion object {
