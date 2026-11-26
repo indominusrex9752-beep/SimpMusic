@@ -263,7 +263,7 @@ new file mode 100644
 +        val retry = JSONArray(request("GET", filter, token))
 +        if (retry.length() == 0) throw IOException("Could not initialize the SimpCloud sync cursor.")
 +        val row = retry.getJSONObject(0)
-        return if (row.isNull("server_cursor")) null else row.optString("server_cursor").takeIf { it.isNotBlank() }
++        return if (row.isNull("server_cursor")) null else row.optString("server_cursor").takeIf { it.isNotBlank() }
 +    }
 +
 +    private fun deviceKey(): String =
@@ -324,7 +324,7 @@ new file mode 100644
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
-@@ -35,176 +35,203 @@
+@@ -35,175 +35,202 @@
  
  class CloudSyncActivity : AppCompatActivity() {
      private val cloudSyncAuth: CloudSyncAuth by inject()
