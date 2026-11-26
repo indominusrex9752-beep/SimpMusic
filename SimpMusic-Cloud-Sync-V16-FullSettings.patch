@@ -2,7 +2,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncS
 new file mode 100644
 --- /dev/null
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncSettingsSync.kt
-@@ -0,0 +1,259 @@
+@@ -0,0 +1,266 @@
 +package com.maxrave.simpmusic.cloudsync
 +
 +import com.maxrave.simpmusic.BuildKonfig
@@ -17,7 +17,14 @@ new file mode 100644
 +import androidx.datastore.preferences.core.longPreferencesKey
 +import androidx.datastore.preferences.core.stringPreferencesKey
 +import androidx.datastore.preferences.core.stringSetPreferencesKey
++import kotlinx.coroutines.CoroutineScope
 +import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.flow.collect
++import kotlinx.coroutines.flow.debounce
++import kotlinx.coroutines.flow.distinctUntilChanged
++import kotlinx.coroutines.flow.drop
++import kotlinx.coroutines.flow.map
++import kotlinx.coroutines.launch
 +import kotlinx.coroutines.sync.Mutex
 +import kotlinx.coroutines.sync.withLock
 +import kotlinx.coroutines.withContext
