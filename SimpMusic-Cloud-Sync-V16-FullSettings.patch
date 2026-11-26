@@ -2,7 +2,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncS
 new file mode 100644
 --- /dev/null
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncSettingsSync.kt
-@@ -0,0 +1,258 @@
+@@ -0,0 +1,257 @@
 +package com.maxrave.simpmusic.cloudsync
 +
 +import android.content.Context
@@ -281,7 +281,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncM
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
-@@ -18,10 +18,12 @@ class CloudSyncWorker(
+@@ -18,9 +18,11 @@ class CloudSyncWorker(
  ) : CoroutineWorker(context, parameters), KoinComponent {
      private val playbackSync: CloudSyncPlaybackSync by inject()
 +    private val settingsSync: CloudSyncSettingsSync by inject()
@@ -293,11 +293,11 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
              Result.success()
          } catch (error: Exception) {
              if (runAttemptCount < 5) Result.retry() else Result.failure()
-@@ -39,3 +41,4 @@ class CloudSyncAutoSync(context: Context) : CloudSyncManualSync, KoinComponent {
+@@ -39,2 +41,3 @@ class CloudSyncAutoSync(context: Context) : CloudSyncManualSync, KoinComponent {
      private val playbackSync: CloudSyncPlaybackSync by inject()
 +    private val settingsSync: CloudSyncSettingsSync by inject()
      private val workManager = WorkManager.getInstance(context.applicationContext)
-@@ -61,5 +64,6 @@ class CloudSyncAutoSync(context: Context) : CloudSyncManualSync, KoinComponent {
+@@ -61,4 +64,5 @@ class CloudSyncAutoSync(context: Context) : CloudSyncManualSync, KoinComponent {
          manualSyncScope.launch {
              try {
                  val result = playbackSync.syncNow()
