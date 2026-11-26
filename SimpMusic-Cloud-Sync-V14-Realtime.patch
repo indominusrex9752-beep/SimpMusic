@@ -12,7 +12,7 @@ diff --git a/androidApp/build.gradle.kts b/androidApp/build.gradle.kts
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
-@@ -1,13 +1,25 @@
+@@ -1,13 +1,26 @@
  package com.maxrave.simpmusic.cloudsync
  
  import android.content.Intent
