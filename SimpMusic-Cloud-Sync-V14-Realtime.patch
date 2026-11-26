@@ -12,7 +12,7 @@ diff --git a/androidApp/build.gradle.kts b/androidApp/build.gradle.kts
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
-@@ -1,13 +1,24 @@
+@@ -1,13 +1,25 @@
  package com.maxrave.simpmusic.cloudsync
  
  import android.content.Intent
@@ -32,6 +32,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
 +import kotlinx.coroutines.coroutineScope
 +import kotlinx.coroutines.flow.collect
 +import kotlinx.coroutines.flow.collectLatest
++import kotlinx.coroutines.flow.debounce
 +import kotlinx.coroutines.flow.filter
 +import kotlinx.coroutines.launch
  
@@ -70,7 +71,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
 +
 +            coroutineScope {
 +                val insertJob = launch {
-+                    inserts.collect { onPlaybackInserted() }
++                    inserts.debounce(1_000).collect { onPlaybackInserted() }
 +                }
 +                val reconnectJob = launch {
 +                    client.realtime.status
