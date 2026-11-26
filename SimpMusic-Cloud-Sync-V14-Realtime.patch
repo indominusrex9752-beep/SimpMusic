@@ -12,7 +12,7 @@ diff --git a/androidApp/build.gradle.kts b/androidApp/build.gradle.kts
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
-@@ -1,11 +1,23 @@
+@@ -1,13 +1,24 @@
  package com.maxrave.simpmusic.cloudsync
  
  import android.content.Intent
@@ -47,7 +47,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
          }
      }
  
-@@ -73,6 +87,46 @@
+@@ -73,6 +87,48 @@
          return CloudCredentials(userId, session.accessToken)
      }
  
@@ -117,7 +117,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
      private val workManager = WorkManager.getInstance(context.applicationContext)
      private val network = Constraints.Builder()
          .setRequiredNetworkType(NetworkType.CONNECTED)
-@@ -38,6 +38,10 @@
+@@ -38,8 +38,12 @@
  
      fun scheduleLaunchSync() = enqueueSync()
  
@@ -134,7 +134,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
 
-@@ -24,6 +26,7 @@
+@@ -24,10 +26,14 @@
  import com.maxrave.logger.Logger
  import com.maxrave.simpmusic.di.viewModelModule
  import com.maxrave.simpmusic.service.backup.AutoBackupScheduler
@@ -149,7 +149,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication
 +import kotlinx.coroutines.isActive
  import kotlinx.coroutines.launch
  import multiplatform.network.cmptoast.AppContext
-@@ -99,7 +104,22 @@
+@@ -99,6 +104,21 @@
                  .collect {
                      cloudAutoSync.schedulePlaybackSync()
                  }
@@ -231,7 +231,7 @@ diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/ho
  import com.maxrave.simpmusic.ui.icon.SimpIcons
 +import com.maxrave.simpmusic.expect.requestManualCloudSync
  import com.maxrave.simpmusic.ui.navigation.destination.home.HomeDestination
-@@ -1157,12 +1160,24 @@
+@@ -1157,11 +1160,23 @@
                              }
                              if (!createPinned) {
 -                                Box(Modifier.padding(start = 8.dp)) { createActions() }
@@ -257,7 +257,7 @@ diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/ho
                      }
                  }
              }
-@@ -1219,5 +1234,29 @@
+@@ -1219,6 +1234,30 @@
  private const val CHIP_FADE_STEPS = 24
  
 +@Composable
