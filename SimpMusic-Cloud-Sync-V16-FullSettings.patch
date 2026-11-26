@@ -280,9 +280,6 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncM
      single<CloudSyncManualSync> { CloudSyncAutoSync(androidContext()) }
 +    single { CloudSyncSettingsSync(androidContext(), get(), get<DataStore<Preferences>>()) }
  }
-diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
---- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
-+++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
 @@ -18,9 +18,11 @@ class CloudSyncWorker(
  ) : CoroutineWorker(context, parameters), KoinComponent {
      private val playbackSync: CloudSyncPlaybackSync by inject()
@@ -305,6 +302,13 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
                  val result = playbackSync.syncNow()
 +                settingsSync.syncNow()
                  onStatus("SimpCloud sync complete: ${result.uploaded} uploaded, ${result.downloaded} downloaded.")
+@@ -56,2 +59,6 @@ class CloudSyncAutoSync(context: Context) : CloudSyncManualSync, KoinComponent {
+     override fun scheduleManualSync() = enqueueSync()
+ 
++    fun observeSettings(scope: CoroutineScope) {
++        settingsSync.observeChanges(scope) { enqueueSync() }
++    }
++
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
