@@ -1,0 +1,262 @@
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncSettingsSync.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncSettingsSync.kt
+new file mode 100644
+--- /dev/null
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncSettingsSync.kt
+@@ -0,0 +1,246 @@
++package com.maxrave.simpmusic.cloudsync
++
++import android.content.Context
++import androidx.datastore.core.DataStore
++import androidx.datastore.preferences.core.Preferences
++import androidx.datastore.preferences.core.booleanPreferencesKey
++import androidx.datastore.preferences.core.doublePreferencesKey
++import androidx.datastore.preferences.core.edit
++import androidx.datastore.preferences.core.floatPreferencesKey
++import androidx.datastore.preferences.core.intPreferencesKey
++import androidx.datastore.preferences.core.longPreferencesKey
++import androidx.datastore.preferences.core.stringPreferencesKey
++import androidx.datastore.preferences.core.stringSetPreferencesKey
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.sync.Mutex
++import kotlinx.coroutines.sync.withLock
++import kotlinx.coroutines.withContext
++import org.json.JSONArray
++import org.json.JSONObject
++import java.io.IOException
++import java.net.HttpURLConnection
++import java.net.URL
++import java.net.URLEncoder
++import java.time.Instant
++
++class CloudSyncSettingsSync(
++    context: Context,
++    private val auth: CloudSyncAuth,
++    private val dataStore: DataStore<Preferences>,
++) {
++    private val appContext = context.applicationContext
++    private val devicePrefs = appContext.getSharedPreferences("simpcloud_device", Context.MODE_PRIVATE)
++    private val statePrefs = appContext.getSharedPreferences("simpcloud_settings_state", Context.MODE_PRIVATE)
++    private val mutex = Mutex()
++
++    suspend fun syncNow(): Int = mutex.withLock {
++        withContext(Dispatchers.IO) {
++            val credentials = auth.cloudCredentials()
++                ?: throw IllegalStateException("Connect your Google account before syncing settings.")
++            val deviceKey = devicePrefs.getString("device_key", null)
++                ?: throw IllegalStateException("SimpCloud device is not registered yet. Sync listening history first.")
++            val remoteRows = JSONArray(request(
++                "GET",
++                "cloud_settings?select=category,settings,revision,updated_at&user_id=eq.${encode(credentials.userId)}",
++                credentials.accessToken,
++            ))
++            val remoteByCategory = mutableMapOf<String, JSONObject>()
++            for (i in 0 until remoteRows.length()) {
++                val row = remoteRows.getJSONObject(i)
++                remoteByCategory[row.getString("category")] = row
++            }
++
++            var changedCategories = 0
++            for (category in CATEGORIES) {
++                val local = snapshot(category)
++                val localHash = local.toString()
++                val previousHash = statePrefs.getString("hash_$category", null)
++                val previousRemoteTime = statePrefs.getString("remote_$category", null)
++                val remote = remoteByCategory[category]
++
++                if (remote == null) {
++                    if (local.length() > 0) {
++                        upload(category, local, 1, credentials.userId, credentials.accessToken, deviceKey)
++                        val now = Instant.now().toString()
++                        statePrefs.edit().putString("hash_$category", localHash).putString("remote_$category", now).apply()
++                        changedCategories++
++                    }
++                    continue
++                }
++
++                val remoteTime = remote.optString("updated_at")
++                val remoteSettings = remote.optJSONObject("settings") ?: JSONObject()
++                val localChanged = previousHash == null || previousHash != localHash
++                val remoteChanged = previousRemoteTime == null || previousRemoteTime != remoteTime
++
++                when {
++                    previousHash == null && previousRemoteTime == null -> {
++                        applySnapshot(category, remoteSettings)
++                        val applied = snapshot(category)
++                        statePrefs.edit().putString("hash_$category", applied.toString())
++                            .putString("remote_$category", remoteTime).apply()
++                        changedCategories++
++                    }
++                    localChanged -> {
++                        val revision = remote.optLong("revision", 1L) + 1L
++                        upload(category, local, revision, credentials.userId, credentials.accessToken, deviceKey)
++                        val now = Instant.now().toString()
++                        statePrefs.edit().putString("hash_$category", localHash)
++                            .putString("remote_$category", now).apply()
++                        changedCategories++
++                    }
++                    remoteChanged -> {
++                        applySnapshot(category, remoteSettings)
++                        val applied = snapshot(category)
++                        statePrefs.edit().putString("hash_$category", applied.toString())
++                            .putString("remote_$category", remoteTime).apply()
++                        changedCategories++
++                    }
++                }
++            }
++            changedCategories
++        }
++    }
++
++    private suspend fun snapshot(category: String): JSONObject {
++        val values = dataStore.dataSnapshot()
++        val result = JSONObject()
++        values.asMap().entries
++            .filter { it.key.name in KEYS_BY_CATEGORY.getValue(category) }
++            .sortedBy { it.key.name }
++            .forEach { (key, value) ->
++                encode(value)?.let { result.put(key.name, it) }
++            }
++        return result
++    }
++
++    private suspend fun applySnapshot(category: String, json: JSONObject) {
++        val allowed = KEYS_BY_CATEGORY.getValue(category)
++        dataStore.edit { preferences ->
++            val iterator = json.keys()
++            while (iterator.hasNext()) {
++                val name = iterator.next()
++                if (name !in allowed) continue
++                val item = json.optJSONObject(name) ?: continue
++                val type = item.optString("type")
++                val value = item.optString("value")
++                when (type) {
++                    "s" -> preferences[stringPreferencesKey(name)] = value
++                    "b" -> value.toBooleanStrictOrNull()?.let { preferences[booleanPreferencesKey(name)] = it }
++                    "i" -> value.toIntOrNull()?.let { preferences[intPreferencesKey(name)] = it }
++                    "l" -> value.toLongOrNull()?.let { preferences[longPreferencesKey(name)] = it }
++                    "f" -> value.toFloatOrNull()?.let { preferences[floatPreferencesKey(name)] = it }
++                    "d" -> value.toDoubleOrNull()?.let { preferences[doublePreferencesKey(name)] = it }
++                    "ss" -> runCatching {
++                        val array = JSONArray(value)
++                        buildSet { for (i in 0 until array.length()) add(array.getString(i)) }
++                    }.getOrNull()?.let { preferences[stringSetPreferencesKey(name)] = it }
++                }
++            }
++        }
++    }
++
++    private fun encode(value: Any): JSONObject? = when (value) {
++        is String -> JSONObject().put("type", "s").put("value", value)
++        is Boolean -> JSONObject().put("type", "b").put("value", value.toString())
++        is Int -> JSONObject().put("type", "i").put("value", value.toString())
++        is Long -> JSONObject().put("type", "l").put("value", value.toString())
++        is Float -> JSONObject().put("type", "f").put("value", value.toString())
++        is Double -> JSONObject().put("type", "d").put("value", value.toString())
++        is Set<*> -> JSONObject().put("type", "ss").put("value", JSONArray(value.filterIsInstance<String>()))
++        else -> null
++    }
++
++    private suspend fun upload(
++        category: String,
++        settings: JSONObject,
++        revision: Long,
++        userId: String,
++        token: String,
++        deviceKey: String,
++    ) {
++        val row = JSONArray().put(
++            JSONObject()
++                .put("user_id", userId)
++                .put("category", category)
++                .put("settings", settings)
++                .put("revision", revision.coerceAtLeast(1L))
++                .put("updated_at", Instant.now().toString())
++                .put("updated_by_device_key", deviceKey),
++        )
++        request(
++            "POST",
++            "cloud_settings?on_conflict=user_id,category",
++            token,
++            row.toString(),
++            "resolution=merge-duplicates,return=minimal",
++        )
++    }
++
++    private suspend fun request(
++        method: String,
++        path: String,
++        token: String,
++        body: String? = null,
++        prefer: String? = null,
++    ): String = withContext(Dispatchers.IO) {
++        val connection = URL("${BuildKonfig.supabaseUrl.trimEnd('/')}/rest/v1/$path")
++            .openConnection() as HttpURLConnection
++        try {
++            connection.requestMethod = method
++            connection.connectTimeout = TIMEOUT_MS
++            connection.readTimeout = TIMEOUT_MS
++            connection.setRequestProperty("apikey", BuildKonfig.supabasePublishableKey)
++            connection.setRequestProperty("Authorization", "Bearer $token")
++            connection.setRequestProperty("Accept", "application/json")
++            connection.setRequestProperty("Content-Type", "application/json")
++            prefer?.let { connection.setRequestProperty("Prefer", it) }
++            if (body != null) {
++                connection.doOutput = true
++                connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
++            }
++            val status = connection.responseCode
++            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
++            val response = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
++            if (status !in 200..299) {
++                val detail = runCatching { JSONObject(response).optString("message") }.getOrNull()
++                throw IOException("Settings sync failed ($status): " + (detail?.takeIf { it.isNotBlank() } ?: response.take(180)))
++            }
++            response
++        } finally {
++            connection.disconnect()
++        }
++    }
++
++    private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
++
++    private suspend fun DataStore<Preferences>.dataSnapshot(): Preferences = data.first()
++
++    private companion object {
++        const val TIMEOUT_MS = 20_000
++        val CATEGORIES = listOf("audio_effects", "playback", "appearance", "general", "lyrics", "library", "notifications")
++        val KEYS_BY_CATEGORY = mapOf(
++            "audio_effects" to setOf(
++                "quality", "download_quality", "video_download_quality", "normalize_volume", "skip_silent",
++                "player_volume", "equalizer_autoeq_profile", "equalizer_bands", "equalizer_enabled",
++                "equalizer_type", "equalizer_preamp", "delay_enabled", "delay_time_ms", "delay_feedback",
++                "delay_mix", "reverb_enabled", "reverb_preset", "reverb_mix", "eight_d_enabled",
++                "eight_d_direction", "eight_d_period_seconds",
++            ),
++            "playback" to setOf(
++                "save_state_of_playback", "watch_video_instead_of_playing_audio", "radio_audio_only",
++                "endless_queue", "playback_speed", "pitch", "kill_service_on_exit", "crossfade_enabled",
++                "crossfade_duration", "crossfade_dj_mode", "crossfade_skip_album",
++            ),
++            "appearance" to setOf(
++                "theme_mode", "theme_color_source", "custom_theme_color", "now_playing_style", "liquid_glass",
++            ),
++            "general" to setOf(
++                "language", "location", "auto_check_for_updates", "update_channel", "explicit_content_enabled",
++                "home_limit", "chart_key", "send_back_to_google",
++            ),
++            "lyrics" to setOf(
++                "lyrics_provider", "translation_language", "use_translation_language", "use_ai_translation",
++                "spotify_lyrics", "lyrics_style", "romanization_languages", "youtube_subtitle_language",
++                "preferred_audio_language", "lyrics_offset_ms",
++            ),
++            "library" to setOf(
++                "sponsor_block_enabled", "radio_audio_only", "spotify_canvas", "am_animated_artwork",
++                "keep_youtube_playlist_offline", "combine_local_and_youtube_liked", "sync_follow_to_youtube",
++                "local_tracking_enabled", "auto_download_liked_songs", "smart_downloads_enabled", "smart_downloads_count",
++                "local_playlist_filter",
++            ),
++            "notifications" to setOf("blog_notification_enabled", "lastfm_scrobble_enabled"),
++        )
++        val ALL_KEYS = KEYS_BY_CATEGORY.values.flatten().toSet()
++    }
++}
