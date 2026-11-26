@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000..1111111
 --- /dev/null
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
-@@ -0,0 +1,93 @@
+@@ -0,0 +1,83 @@
 +package com.maxrave.simpmusic.cloudsync
 +
 +import android.content.Context
@@ -16,8 +16,6 @@ index 0000000..1111111
 +import androidx.work.OneTimeWorkRequestBuilder
 +import androidx.work.WorkManager
 +import androidx.work.WorkerParameters
-+import kotlinx.coroutines.Dispatchers
-+import kotlinx.coroutines.withContext
 +import org.koin.core.component.KoinComponent
 +import org.koin.core.component.inject
 +import java.util.concurrent.TimeUnit
@@ -47,11 +45,7 @@ index 0000000..1111111
 +        val request = OneTimeWorkRequestBuilder<CloudSyncWorker>()
 +            .setConstraints(network)
 +            .build()
-+        workManager.enqueueUniqueWork(
-+            LAUNCH_WORK,
-+            ExistingWorkPolicy.KEEP,
-+            request,
-+        )
++        workManager.enqueueUniqueWork(LAUNCH_WORK, ExistingWorkPolicy.KEEP, request)
 +    }
 +
 +    fun schedulePlaybackSync() {
@@ -59,11 +53,7 @@ index 0000000..1111111
 +            .setConstraints(network)
 +            .setInitialDelay(25, TimeUnit.SECONDS)
 +            .build()
-+        workManager.enqueueUniqueWork(
-+            PLAYBACK_WORK,
-+            ExistingWorkPolicy.REPLACE,
-+            request,
-+        )
++        workManager.enqueueUniqueWork(PLAYBACK_WORK, ExistingWorkPolicy.REPLACE, request)
 +    }
 +
 +    fun schedulePeriodicSync() {
@@ -77,9 +67,53 @@ index 0000000..1111111
 +        )
 +    }
 +
-+    companion object {
-+        private const val LAUNCH_WORK = "simpcloud_launch_sync"
-+        private const val PLAYBACK_WORK = "simpcloud_playback_sync"
-+        private const val PERIODIC_WORK = "simpcloud_periodic_sync"
++    private companion object {
++        const val LAUNCH_WORK = "simpcloud_launch_sync"
++        const val PLAYBACK_WORK = "simpcloud_playback_sync"
++        const val PERIODIC_WORK = "simpcloud_periodic_sync"
 +    }
 +}
++
++diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
++--- a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
+++++ b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
++@@ -1,5 +1,6 @@
++ package com.maxrave.simpmusic
++ 
+++import com.maxrave.data.librarysync.PlaybackSyncSignal
++ import android.app.Application
++@@ -30,6 +31,7 @@
++ import com.maxrave.simpmusic.utils.NetworkFirstInterceptor
+++import com.maxrave.simpmusic.cloudsync.CloudSyncAutoSync
++@@ -76,6 +78,15 @@
++         // initialize WorkManager
++         WorkManager.initialize(this, workConfig)
+++
+++        // SimpCloud: launch, playback-event and periodic background sync.
+++        val cloudAutoSync = CloudSyncAutoSync(this)
+++        cloudAutoSync.scheduleLaunchSync()
+++        cloudAutoSync.schedulePeriodicSync()
+++        applicationScope.launch {
+++            PlaybackSyncSignal.events.collect {
+++                cloudAutoSync.schedulePlaybackSync()
+++            }
+++        }
++ 
++         // Initialize and start AutoBackupScheduler
++diff --git a/.github/workflows/android.yml b/.github/workflows/android.yml
++--- a/.github/workflows/android.yml
+++++ b/.github/workflows/android.yml
++@@ -1,4 +1,4 @@
++-name: Build SimpMusic Debug APK V13 (SimpCloud Playback Sync)
+++name: Build SimpMusic Debug APK V14 (Automatic Sync & Full Settings Sync)
++@@ -72,6 +72,11 @@
++           git apply SimpMusic-Cloud-Sync-V13-Playback.patch
+++
+++      - name: Apply SimpCloud V14 automatic sync
+++        run: |
+++          git apply --check SimpMusic-Cloud-Sync-V14-AutoSync.patch
+++          git apply SimpMusic-Cloud-Sync-V14-AutoSync.patch
+++
++ 
++       - name: Generate library definitions
++
