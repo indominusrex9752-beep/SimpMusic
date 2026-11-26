@@ -3,7 +3,7 @@ new file mode 100644
 --- /dev/null
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
 @@ -0,0 +1,53 @@
-+package com.maxrave.simpmusic.cloudsync
+package com.maxrave.simpmusic.cloudsync
 +
 +import android.content.Context
 +import androidx.work.Constraints
@@ -56,23 +56,24 @@ new file mode 100644
 +        const val SYNC_WORK = "simpcloud_sync"
 +    }
 +}
-
++
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
-@@ -1,5 +1,7 @@
+@@ -1,4 +1,6 @@
  package com.maxrave.simpmusic
  
 +import com.maxrave.data.librarysync.PlaybackSyncSignal
 +import com.maxrave.simpmusic.cloudsync.CloudSyncAutoSync
  import android.annotation.SuppressLint
  import android.app.Application
-@@ -19,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
+@@ -30,4 +30,5 @@
+ import kotlinx.coroutines.Dispatchers
  import kotlinx.coroutines.SupervisorJob
  import kotlinx.coroutines.launch
 +import kotlinx.coroutines.flow.debounce
  import multiplatform.network.cmptoast.AppContext
-@@ -79,6 +82,17 @@
+@@ -86,4 +86,15 @@
  
          // initialize WorkManager
          WorkManager.initialize(this, workConfig)
