@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000..1111111
 --- /dev/null
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
-@@ -0,0 +1,83 @@
+@@ -0,0 +1,82 @@
 +package com.maxrave.simpmusic.cloudsync
 +
 +import android.content.Context
@@ -12,8 +12,8 @@ index 0000000..1111111
 +import androidx.work.ExistingPeriodicWorkPolicy
 +import androidx.work.ExistingWorkPolicy
 +import androidx.work.NetworkType
-+import androidx.work.PeriodicWorkRequestBuilder
 +import androidx.work.OneTimeWorkRequestBuilder
++import androidx.work.PeriodicWorkRequestBuilder
 +import androidx.work.WorkManager
 +import androidx.work.WorkerParameters
 +import org.koin.core.component.KoinComponent
@@ -89,7 +89,7 @@ index 0000000..1111111
 +         // initialize WorkManager
 +         WorkManager.initialize(this, workConfig)
 ++
-++        // SimpCloud: launch, playback-event and periodic background sync.
+++        // SimpCloud background sync: app launch, new plays and periodic fallback.
 ++        val cloudAutoSync = CloudSyncAutoSync(this)
 ++        cloudAutoSync.scheduleLaunchSync()
 ++        cloudAutoSync.schedulePeriodicSync()
@@ -106,7 +106,7 @@ index 0000000..1111111
 +@@ -1,4 +1,4 @@
 +-name: Build SimpMusic Debug APK V13 (SimpCloud Playback Sync)
 ++name: Build SimpMusic Debug APK V14 (Automatic Sync & Full Settings Sync)
-+@@ -72,6 +72,11 @@
++@@ -66,6 +66,11 @@
 +           git apply SimpMusic-Cloud-Sync-V13-Playback.patch
 ++
 ++      - name: Apply SimpCloud V14 automatic sync
