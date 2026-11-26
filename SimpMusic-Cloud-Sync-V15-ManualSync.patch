@@ -9,7 +9,6 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncP
  import kotlinx.coroutines.withContext
  import kotlinx.datetime.TimeZone
  import kotlinx.datetime.toInstant
- import kotlinx.datetime.toLocalDateTime
 @@ -30,8 +32,10 @@
  ) {
      private val preferences =
@@ -30,52 +29,86 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncP
      }
  
      private fun registerDevice(userId: String, token: String, deviceKey: String): String {
-diff --git a/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.android.kt b/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.android.kt
---- a/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.android.kt
-+++ b/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.android.kt
-@@ -1,8 +1,43 @@
+diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/cloudsync/CloudSyncManualSync.kt b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/cloudsync/CloudSyncManualSync.kt
+--- a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/cloudsync/CloudSyncManualSync.kt
++++ b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/cloudsync/CloudSyncManualSync.kt
+@@ -1,5 +1,6 @@
+ package com.maxrave.simpmusic.cloudsync
+ 
+ interface CloudSyncManualSync {
+     fun scheduleManualSync()
++    fun syncManual(onStatus: (String) -> Unit)
+ }
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
+--- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
+@@ -10,3 +10,7 @@
+ import androidx.work.WorkManager
+ import androidx.work.WorkerParameters
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.SupervisorJob
+ import org.koin.core.component.KoinComponent
+ import org.koin.core.component.inject
++import kotlinx.coroutines.launch
++import java.util.concurrent.atomic.AtomicBoolean
+@@ -29,14 +33,38 @@
+-class CloudSyncAutoSync(context: Context) : CloudSyncManualSync {
++class CloudSyncAutoSync(context: Context) : CloudSyncManualSync, KoinComponent {
++    private val playbackSync: CloudSyncPlaybackSync by inject()
+     private val workManager = WorkManager.getInstance(context.applicationContext)
+     private val network = Constraints.Builder()
+         .setRequiredNetworkType(NetworkType.CONNECTED)
+         .build()
++    private val manualSyncInProgress = AtomicBoolean(false)
++    private val manualSyncScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+ 
+     fun scheduleLaunchSync() = enqueueSync()
+ 
+     fun schedulePlaybackSync() = enqueueSync()
+ 
+     fun scheduleRealtimeSync() = enqueueSync()
+ 
+     override fun scheduleManualSync() = enqueueSync()
+ 
++    override fun syncManual(onStatus: (String) -> Unit) {
++        if (!manualSyncInProgress.compareAndSet(false, true)) {
++            onStatus("A SimpCloud sync is already running.")
++            return
++        }
++        onStatus("SimpCloud: Syncing now…")
++        manualSyncScope.launch {
++            try {
++                val result = playbackSync.syncNow()
++                onStatus("SimpCloud sync complete: ${result.uploaded} uploaded, ${result.downloaded} downloaded.")
++            } catch (error: CancellationException) {
++                throw error
++            } catch (error: Exception) {
++                val message = error.message?.take(150) ?: "Please try again."
++                onStatus("SimpCloud sync failed: $message")
++            } finally {
++                manualSyncInProgress.set(false)
++            }
++        }
++    }
++
+     private fun enqueueSync() {
+         val request = OneTimeWorkRequestBuilder<CloudSyncWorker>()
+             .setConstraints(network)
+@@ -1,9 +1,18 @@
  package com.maxrave.simpmusic.expect
  
 -import com.maxrave.simpmusic.cloudsync.CloudSyncManualSync
 +import android.content.Context
 +import android.widget.Toast
-+import com.maxrave.simpmusic.cloudsync.CloudSyncPlaybackSync
-+import kotlinx.coroutines.CancellationException
-+import kotlinx.coroutines.CoroutineScope
-+import kotlinx.coroutines.Dispatchers
-+import kotlinx.coroutines.SupervisorJob
-+import kotlinx.coroutines.launch
++import com.maxrave.simpmusic.cloudsync.CloudSyncManualSync
  import org.koin.mp.KoinPlatform.getKoin
-+import java.util.concurrent.atomic.AtomicBoolean
  
-+private val manualSyncInProgress = AtomicBoolean(false)
-+private val manualSyncScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-+
  actual fun requestManualCloudSync() {
 -    getKoin().get<CloudSyncManualSync>().scheduleManualSync()
-+    val koin = getKoin()
-+    val context: Context = koin.get()
-+    if (!manualSyncInProgress.compareAndSet(false, true)) {
-+        Toast.makeText(context, "SimpCloud sync is already running.", Toast.LENGTH_SHORT).show()
-+        return
-+    }
-+
-+    Toast.makeText(context, "SimpCloud: Syncing now…", Toast.LENGTH_SHORT).show()
-+    manualSyncScope.launch {
-+        try {
-+            val result = koin.get<CloudSyncPlaybackSync>().syncNow()
-+            Toast.makeText(
-+                context,
-+                "SimpCloud sync complete: ${result.uploaded} uploaded, ${result.downloaded} downloaded.",
-+                Toast.LENGTH_LONG,
-+            ).show()
-+        } catch (error: CancellationException) {
-+            throw error
-+        } catch (error: Exception) {
-+            val message = error.message?.take(150) ?: "Please try again."
-+            Toast.makeText(context, "SimpCloud sync failed: $message", Toast.LENGTH_LONG).show()
-+        } finally {
-+            manualSyncInProgress.set(false)
-+        }
++    val context: Context = getKoin().get()
++    getKoin().get<CloudSyncManualSync>().syncManual { message ->
++        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
 +    }
  }
