@@ -2,22 +2,19 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
 new file mode 100644
 --- /dev/null
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
-@@ -0,0 +1,69 @@
+@@ -0,0 +1,53 @@
 +package com.maxrave.simpmusic.cloudsync
 +
 +import android.content.Context
 +import androidx.work.Constraints
 +import androidx.work.CoroutineWorker
-+import androidx.work.ExistingPeriodicWorkPolicy
 +import androidx.work.ExistingWorkPolicy
 +import androidx.work.NetworkType
 +import androidx.work.OneTimeWorkRequestBuilder
-+import androidx.work.PeriodicWorkRequestBuilder
 +import androidx.work.WorkManager
 +import androidx.work.WorkerParameters
 +import org.koin.core.component.KoinComponent
 +import org.koin.core.component.inject
-+import java.util.concurrent.TimeUnit
 +
 +class CloudSyncWorker(
 +    context: Context,
@@ -40,36 +37,23 @@ new file mode 100644
 +        .setRequiredNetworkType(NetworkType.CONNECTED)
 +        .build()
 +
-+    fun scheduleLaunchSync() {
++    fun scheduleLaunchSync() = enqueueSync()
++
++    fun schedulePlaybackSync() = enqueueSync()
++
++    private fun enqueueSync() {
 +        val request = OneTimeWorkRequestBuilder<CloudSyncWorker>()
 +            .setConstraints(network)
 +            .build()
-+        workManager.enqueueUniqueWork(LAUNCH_WORK, ExistingWorkPolicy.KEEP, request)
-+    }
-+
-+    fun schedulePlaybackSync() {
-+        val request = OneTimeWorkRequestBuilder<CloudSyncWorker>()
-+            .setConstraints(network)
-+            .setInitialDelay(25, TimeUnit.SECONDS)
-+            .build()
-+        workManager.enqueueUniqueWork(PLAYBACK_WORK, ExistingWorkPolicy.REPLACE, request)
-+    }
-+
-+    fun schedulePeriodicSync() {
-+        val request = PeriodicWorkRequestBuilder<CloudSyncWorker>(
-+            15, TimeUnit.MINUTES,
-+        ).setConstraints(network).build()
-+        workManager.enqueueUniquePeriodicWork(
-+            PERIODIC_WORK,
-+            ExistingPeriodicWorkPolicy.KEEP,
++        workManager.enqueueUniqueWork(
++            SYNC_WORK,
++            ExistingWorkPolicy.APPEND_OR_REPLACE,
 +            request,
 +        )
 +    }
 +
 +    private companion object {
-+        const val LAUNCH_WORK = "simpcloud_launch_sync"
-+        const val PLAYBACK_WORK = "simpcloud_playback_sync"
-+        const val PERIODIC_WORK = "simpcloud_periodic_sync"
++        const val SYNC_WORK = "simpcloud_sync"
 +    }
 +}
 
@@ -83,35 +67,25 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication
 +import com.maxrave.simpmusic.cloudsync.CloudSyncAutoSync
  import android.annotation.SuppressLint
  import android.app.Application
-@@ -84,6 +86,15 @@
+@@ -19,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.SupervisorJob
+ import kotlinx.coroutines.launch
++import kotlinx.coroutines.flow.debounce
+ import multiplatform.network.cmptoast.AppContext
+@@ -79,6 +82,17 @@
+ 
          // initialize WorkManager
          WorkManager.initialize(this, workConfig)
  
-+        // SimpCloud background sync: launch, new plays and periodic fallback.
++        // Queue one launch sync and coalesce bursts of playback events.
 +        val cloudAutoSync = CloudSyncAutoSync(this)
 +        cloudAutoSync.scheduleLaunchSync()
-+        cloudAutoSync.schedulePeriodicSync()
 +        applicationScope.launch {
-+            PlaybackSyncSignal.events.collect {
-+                cloudAutoSync.schedulePlaybackSync()
-+            }
++            PlaybackSyncSignal.events
++                .debounce(20_000)
++                .collect {
++                    cloudAutoSync.schedulePlaybackSync()
++                }
 +        }
 +
          // Initialize and start AutoBackupScheduler
-
-diff --git a/.github/workflows/android.yml b/.github/workflows/android.yml
---- a/.github/workflows/android.yml
-+++ b/.github/workflows/android.yml
-@@ -1,4 +1,4 @@
--name: Build SimpMusic Debug APK V13 (SimpCloud Playback Sync)
-+name: Build SimpMusic Debug APK V14 (Automatic Sync & Full Settings Sync)
-@@ -67,6 +67,11 @@
-           git apply --check SimpMusic-Cloud-Sync-V13-Playback.patch
-           git apply SimpMusic-Cloud-Sync-V13-Playback.patch
- 
-+      - name: Apply SimpCloud V14 automatic sync
-+        run: |
-+          git apply --check SimpMusic-Cloud-Sync-V14-AutoSync.patch
-+          git apply SimpMusic-Cloud-Sync-V14-AutoSync.patch
-+
-       - name: Generate library definitions

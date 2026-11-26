@@ -1,4 +1,4 @@
-name: Build SimpMusic Debug APK V13 (SimpCloud Playback Sync)
+name: Build SimpMusic Debug APK V14 (Automatic Sync & Full Settings Sync)
 
 on:
   workflow_dispatch:
@@ -66,6 +66,11 @@ jobs:
         run: |
           git apply --check SimpMusic-Cloud-Sync-V13-Playback.patch
           git apply SimpMusic-Cloud-Sync-V13-Playback.patch
+
+      - name: Apply SimpCloud V14 automatic sync
+        run: |
+          git apply --check SimpMusic-Cloud-Sync-V14-AutoSync.patch
+          git apply SimpMusic-Cloud-Sync-V14-AutoSync.patch
 
       - name: Generate library definitions
         run: ./gradlew exportLibraryDefinitions
