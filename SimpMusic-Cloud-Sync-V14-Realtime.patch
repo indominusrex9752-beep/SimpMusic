@@ -63,7 +63,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
 +            val session = (sessionStatus as? SessionStatus.Authenticated)?.session
 +                ?: return@collectLatest
 +            val userId = session.user?.id ?: return@collectLatest
-+            val channel = client.realtime.channel("simpcloud-playback-$userId")
++            val channel = client.realtime.channel("simpcloud-playback-$userId") {}
 +            val inserts = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
 +                table = "cloud_playback_events"
 +                filter = "user_id=eq.$userId"
