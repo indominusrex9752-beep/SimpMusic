@@ -2,7 +2,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
 new file mode 100644
 --- /dev/null
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
-@@ -0,0 +1,53 @@
+@@ -0,0 +1,58 @@
 +package com.maxrave.simpmusic.cloudsync
 +
 +import android.content.Context
@@ -31,7 +31,7 @@ new file mode 100644
 +        }
 +}
 +
-+class CloudSyncAutoSync(context: Context) {
++class CloudSyncAutoSync(context: Context) : CloudSyncManualSync {
 +    private val workManager = WorkManager.getInstance(context.applicationContext)
 +    private val network = Constraints.Builder()
 +        .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -40,6 +40,10 @@ new file mode 100644
 +    fun scheduleLaunchSync() = enqueueSync()
 +
 +    fun schedulePlaybackSync() = enqueueSync()
++
++    fun scheduleRealtimeSync() = enqueueSync()
++
++    override fun scheduleManualSync() = enqueueSync()
 +
 +    private fun enqueueSync() {
 +        val request = OneTimeWorkRequestBuilder<CloudSyncWorker>()

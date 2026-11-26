@@ -106,24 +106,6 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncM
      single { CloudSyncPlaybackSync(androidContext(), get(), get<SyncDao>()) }
 +    single<CloudSyncManualSync> { CloudSyncAutoSync(androidContext()) }
  }
-diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
---- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
-+++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
-@@ -27,3 +27,3 @@
- }
- 
--class CloudSyncAutoSync(context: Context) {
-+class CloudSyncAutoSync(context: Context) : CloudSyncManualSync {
-@@ -37,5 +37,9 @@
-     fun schedulePlaybackSync() = enqueueSync()
- 
-+    fun scheduleRealtimeSync() = enqueueSync()
-+
-+    override fun scheduleManualSync() = enqueueSync()
-+
-     private fun enqueueSync() {
-         val request = OneTimeWorkRequestBuilder<CloudSyncWorker>()
-             .setConstraints(network)
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
