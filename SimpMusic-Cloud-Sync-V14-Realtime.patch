@@ -114,7 +114,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
  
 -class CloudSyncAutoSync(context: Context) {
 +class CloudSyncAutoSync(context: Context) : CloudSyncManualSync {
-@@ -42,3 +42,7 @@
+@@ -42,5 +42,9 @@
      fun schedulePlaybackSync() = enqueueSync()
  
 +    fun scheduleRealtimeSync() = enqueueSync()
