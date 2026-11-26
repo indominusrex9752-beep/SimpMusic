@@ -133,12 +133,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
-@@ -10,6 +10,7 @@
- import androidx.work.WorkManager
- import cat.ereza.customactivityoncrash.config.CaocConfig
- import coil3.ImageLoader
- import coil3.PlatformContext
- import coil3.SingletonImageLoader
+
 @@ -24,6 +26,7 @@
  import com.maxrave.logger.Logger
  import com.maxrave.simpmusic.di.viewModelModule
