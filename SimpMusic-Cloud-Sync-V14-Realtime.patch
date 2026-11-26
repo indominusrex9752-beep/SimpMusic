@@ -109,9 +109,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncM
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
-@@ -32,3 +32,3 @@
- }
- 
+@@ -34,1 +34,1 @@
 -class CloudSyncAutoSync(context: Context) {
 +class CloudSyncAutoSync(context: Context) : CloudSyncManualSync {
 @@ -42,5 +42,9 @@
