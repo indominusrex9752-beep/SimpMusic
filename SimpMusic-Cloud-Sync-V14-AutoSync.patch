@@ -1,0 +1,85 @@
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
+@@ -0,0 +1,93 @@
++package com.maxrave.simpmusic.cloudsync
++
++import android.content.Context
++import androidx.work.Constraints
++import androidx.work.CoroutineWorker
++import androidx.work.ExistingPeriodicWorkPolicy
++import androidx.work.ExistingWorkPolicy
++import androidx.work.NetworkType
++import androidx.work.PeriodicWorkRequestBuilder
++import androidx.work.OneTimeWorkRequestBuilder
++import androidx.work.WorkManager
++import androidx.work.WorkerParameters
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.withContext
++import org.koin.core.component.KoinComponent
++import org.koin.core.component.inject
++import java.util.concurrent.TimeUnit
++
++class CloudSyncWorker(
++    context: Context,
++    parameters: WorkerParameters,
++) : CoroutineWorker(context, parameters), KoinComponent {
++    private val playbackSync: CloudSyncPlaybackSync by inject()
++
++    override suspend fun doWork(): Result =
++        try {
++            playbackSync.syncNow()
++            Result.success()
++        } catch (error: Exception) {
++            if (runAttemptCount < 5) Result.retry() else Result.failure()
++        }
++}
++
++class CloudSyncAutoSync(context: Context) {
++    private val workManager = WorkManager.getInstance(context.applicationContext)
++    private val network = Constraints.Builder()
++        .setRequiredNetworkType(NetworkType.CONNECTED)
++        .build()
++
++    fun scheduleLaunchSync() {
++        val request = OneTimeWorkRequestBuilder<CloudSyncWorker>()
++            .setConstraints(network)
++            .build()
++        workManager.enqueueUniqueWork(
++            LAUNCH_WORK,
++            ExistingWorkPolicy.KEEP,
++            request,
++        )
++    }
++
++    fun schedulePlaybackSync() {
++        val request = OneTimeWorkRequestBuilder<CloudSyncWorker>()
++            .setConstraints(network)
++            .setInitialDelay(25, TimeUnit.SECONDS)
++            .build()
++        workManager.enqueueUniqueWork(
++            PLAYBACK_WORK,
++            ExistingWorkPolicy.REPLACE,
++            request,
++        )
++    }
++
++    fun schedulePeriodicSync() {
++        val request = PeriodicWorkRequestBuilder<CloudSyncWorker>(
++            15, TimeUnit.MINUTES,
++        ).setConstraints(network).build()
++        workManager.enqueueUniquePeriodicWork(
++            PERIODIC_WORK,
++            ExistingPeriodicWorkPolicy.KEEP,
++            request,
++        )
++    }
++
++    companion object {
++        private const val LAUNCH_WORK = "simpcloud_launch_sync"
++        private const val PLAYBACK_WORK = "simpcloud_playback_sync"
++        private const val PERIODIC_WORK = "simpcloud_periodic_sync"
++    }
++}
