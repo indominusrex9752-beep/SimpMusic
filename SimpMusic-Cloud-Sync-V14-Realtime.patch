@@ -268,6 +268,34 @@ diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/ho
                      }
                  }
              }
-@@ -1218,6 +1233,29 @@
+@@ -1219,6 +1234,28 @@
+ private const val CHIP_FADE_STEPS = 24
+ 
++@Composable
++private fun ManualCloudSyncButton() {
++    Box(
++        modifier = Modifier.size(44.dp),
++        contentAlignment = Alignment.Center,
++    ) {
++        Box(
++            modifier = Modifier
++                .size(36.dp)
++                .clip(CircleShape)
++                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
++                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
++                .clickable { requestManualCloudSync() },
++            contentAlignment = Alignment.Center,
++        ) {
++            Icon(
++                SimpIcons.Sync,
++                contentDescription = "Sync playback history",
++                tint = MaterialTheme.colorScheme.onBackground,
++            )
++        }
++    }
++}
++
+ /**
+  * The avatar at the start of Home's header. It opens a menu showing who is signed in and the
   * greeting the old app bar used to show. Signed out, the avatar is a person glyph and the menu
-  * is a person glyph and the menu
+  * offers the log-in.
