@@ -250,7 +250,7 @@ new file mode 100644
 +        val rows = JSONArray(request("GET", filter, token))
 +        if (rows.length() > 0) {
 +            val row = rows.getJSONObject(0)
-            return if (row.isNull("server_cursor")) null else row.optString("server_cursor").takeIf { it.isNotBlank() }
++    +        return if (row.isNull("server_cursor")) null else row.optString("server_cursor").takeIf { it.isNotBlank() }
 +        }
 +        val body = JSONArray().put(JSONObject().put("user_id", userId).put("device_key", deviceKey))
 +        request(
