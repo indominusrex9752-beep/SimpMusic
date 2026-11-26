@@ -2,7 +2,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncS
 new file mode 100644
 --- /dev/null
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncSettingsSync.kt
-@@ -0,0 +1,266 @@
+@@ -0,0 +1,282 @@
 +package com.maxrave.simpmusic.cloudsync
 +
 +import com.maxrave.simpmusic.BuildKonfig
@@ -117,22 +117,22 @@ new file mode 100644
 +    }
 +
 +    fun observeChanges(scope: CoroutineScope, onChanged: () -> Unit) {
-        scope.launch {
-            dataStore.data
-                .map { preferences ->
-                    preferences.asMap().entries
-                        .filter { it.key.name in ALL_KEYS }
-                        .sortedBy { it.key.name }
-                        .joinToString("|") { "${it.key.name}=${it.value}" }
-                }
-                .distinctUntilChanged()
-                .drop(1)
-                .debounce(2_500)
-                .collect { onChanged() }
-        }
-    }
-
-    private suspend fun snapshot(category: String): JSONObject {
++        scope.launch {
++            dataStore.data
++                .map { preferences ->
++                    preferences.asMap().entries
++                        .filter { it.key.name in ALL_KEYS }
++                        .sortedBy { it.key.name }
++                        .joinToString("|") { "${it.key.name}=${it.value}" }
++                }
++                .distinctUntilChanged()
++                .drop(1)
++                .debounce(2_500)
++                .collect { onChanged() }
++        }
++    }
++
++    private suspend fun snapshot(category: String): JSONObject {
 +        val values = dataStore.dataSnapshot()
 +        val result = JSONObject()
 +        values.asMap().entries
