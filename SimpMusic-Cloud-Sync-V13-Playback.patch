@@ -16,9 +16,10 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
 -}
 +    suspend fun cloudCredentials(): CloudCredentials? {
 +        if (!isConfigured) return null
-+        val session = client.auth.refreshCurrentSession()
-+        val userId = client.auth.currentUserOrNull()?.id
-+            ?: session.user?.id
++        client.auth.refreshCurrentSession()
++        val session = client.auth.currentSessionOrNull() ?: return null
++        val userId = session.user?.id
++            ?: client.auth.currentUserOrNull()?.id
 +            ?: return null
 +        return CloudCredentials(userId, session.accessToken)
 +    }
