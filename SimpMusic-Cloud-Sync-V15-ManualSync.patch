@@ -1,0 +1,81 @@
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncPlaybackSync.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncPlaybackSync.kt
+--- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncPlaybackSync.kt
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncPlaybackSync.kt
+@@ -8,7 +8,9 @@
+ import com.maxrave.simpmusic.BuildKonfig
+ import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.sync.Mutex
++import kotlinx.coroutines.sync.withLock
+ import kotlinx.coroutines.withContext
+ import kotlinx.datetime.TimeZone
+ import kotlinx.datetime.toInstant
+ import kotlinx.datetime.toLocalDateTime
+@@ -33,10 +35,12 @@
+ ) {
+     private val preferences =
+         context.applicationContext.getSharedPreferences("simpcloud_device", Context.MODE_PRIVATE)
++    private val syncMutex = Mutex()
+ 
+-    suspend fun syncNow(): CloudSyncResult = withContext(Dispatchers.IO) {
++    suspend fun syncNow(): CloudSyncResult = syncMutex.withLock {
++        withContext(Dispatchers.IO) {
+         val credentials = auth.cloudCredentials()
+             ?: throw IllegalStateException("Connect your Google account before syncing.")
+         val deviceKey = deviceKey()
+@@ -139,7 +143,8 @@
+             "return=minimal",
+         )
+         CloudSyncResult(uploaded, downloaded)
++        }
+     }
+ 
+     private fun registerDevice(userId: String, token: String, deviceKey: String): String {
+diff --git a/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.android.kt b/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.android.kt
+--- a/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.android.kt
++++ b/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.android.kt
+@@ -1,9 +1,48 @@
+ package com.maxrave.simpmusic.expect
+ 
+-import com.maxrave.simpmusic.cloudsync.CloudSyncManualSync
++import android.content.Context
++import android.widget.Toast
++import com.maxrave.simpmusic.cloudsync.CloudSyncPlaybackSync
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.SupervisorJob
++import kotlinx.coroutines.launch
+ import org.koin.mp.KoinPlatform.getKoin
++import java.util.concurrent.atomic.AtomicBoolean
+ 
++private val manualSyncInProgress = AtomicBoolean(false)
++private val manualSyncScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
++
+ actual fun requestManualCloudSync() {
+-    getKoin().get<CloudSyncManualSync>().scheduleManualSync()
++    val koin = getKoin()
++    val context: Context = koin.get()
++    if (!manualSyncInProgress.compareAndSet(false, true)) {
++        Toast.makeText(context, "SimpCloud sync is already running.", Toast.LENGTH_SHORT).show()
++        return
++    }
++
++    Toast.makeText(context, "SimpCloud: Syncing now…", Toast.LENGTH_SHORT).show()
++    manualSyncScope.launch {
++        try {
++            val result = koin.get<CloudSyncPlaybackSync>().syncNow()
++            Toast.makeText(
++                context,
++                "SimpCloud sync complete: ${result.uploaded} uploaded, ${result.downloaded} downloaded.",
++                Toast.LENGTH_LONG,
++            ).show()
++        } catch (error: CancellationException) {
++            throw error
++        } catch (error: Exception) {
++            val message = error.message?.take(150) ?: "Please try again."
++            Toast.makeText(context, "SimpCloud sync failed: $message", Toast.LENGTH_LONG).show()
++        } finally {
++            manualSyncInProgress.set(false)
++        }
++    }
+ }
