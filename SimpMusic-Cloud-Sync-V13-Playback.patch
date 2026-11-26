@@ -60,7 +60,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncP
 new file mode 100644
 --- /dev/null
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncPlaybackSync.kt
-@@ -0,0 +1,264 @@
+@@ -0,0 +1,263 @@
 +package com.maxrave.simpmusic.cloudsync
 +
 +import android.content.Context
