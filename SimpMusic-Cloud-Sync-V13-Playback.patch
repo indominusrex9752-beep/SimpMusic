@@ -60,7 +60,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncP
 new file mode 100644
 --- /dev/null
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncPlaybackSync.kt
-@@ -0,0 +1,258 @@
+@@ -0,0 +1,260 @@
 +package com.maxrave.simpmusic.cloudsync
 +
 +import android.content.Context
@@ -249,7 +249,8 @@ new file mode 100644
 +            "cloud_sync_state?select=server_cursor&user_id=eq.${encode(userId)}&device_key=eq.${encode(deviceKey)}&limit=1"
 +        val rows = JSONArray(request("GET", filter, token))
 +        if (rows.length() > 0) {
-+            return rows.getJSONObject(0).optString("server_cursor").takeIf { it.isNotBlank() }
++            val row = rows.getJSONObject(0)
+            return if (row.isNull("server_cursor")) null else row.optString("server_cursor").takeIf { it.isNotBlank() }
 +        }
 +        val body = JSONArray().put(JSONObject().put("user_id", userId).put("device_key", deviceKey))
 +        request(
@@ -261,7 +262,8 @@ new file mode 100644
 +        )
 +        val retry = JSONArray(request("GET", filter, token))
 +        if (retry.length() == 0) throw IOException("Could not initialize the SimpCloud sync cursor.")
-+        return retry.getJSONObject(0).optString("server_cursor").takeIf { it.isNotBlank() }
++        val row = retry.getJSONObject(0)
+        return if (row.isNull("server_cursor")) null else row.optString("server_cursor").takeIf { it.isNotBlank() }
 +    }
 +
 +    private fun deviceKey(): String =
