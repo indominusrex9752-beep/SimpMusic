@@ -3,7 +3,7 @@ new file mode 100644
 --- /dev/null
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
 @@ -0,0 +1,53 @@
-package com.maxrave.simpmusic.cloudsync
++package com.maxrave.simpmusic.cloudsync
 +
 +import android.content.Context
 +import androidx.work.Constraints
@@ -73,7 +73,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication
  import kotlinx.coroutines.launch
 +import kotlinx.coroutines.flow.debounce
  import multiplatform.network.cmptoast.AppContext
-@@ -86,4 +86,15 @@
+@@ -86,5 +86,16 @@
  
          // initialize WorkManager
          WorkManager.initialize(this, workConfig)
