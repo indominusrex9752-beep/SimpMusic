@@ -12,7 +12,7 @@ diff --git a/androidApp/build.gradle.kts b/androidApp/build.gradle.kts
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
-@@ -1,7 +1,18 @@
+@@ -1,11 +1,23 @@
  package com.maxrave.simpmusic.cloudsync
  
  import android.content.Intent
@@ -47,7 +47,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
          }
      }
  
-@@ -73,6 +87,48 @@
+@@ -73,6 +87,46 @@
          return CloudCredentials(userId, session.accessToken)
      }
  
@@ -133,13 +133,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
-@@ -4,6 +4,7 @@
- import android.app.Application
- import android.database.CursorWindow
- import android.os.Build
- import android.util.Log
- import androidx.work.Configuration
-@@ -10,6 +11,7 @@
+@@ -10,6 +10,7 @@
  import androidx.work.WorkManager
  import cat.ereza.customactivityoncrash.config.CaocConfig
  import coil3.ImageLoader
@@ -160,7 +154,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication
 +import kotlinx.coroutines.isActive
  import kotlinx.coroutines.launch
  import multiplatform.network.cmptoast.AppContext
-@@ -99,6 +104,21 @@
+@@ -99,7 +104,22 @@
                  .collect {
                      cloudAutoSync.schedulePlaybackSync()
                  }
@@ -186,7 +180,7 @@ diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/cloudsync/Cl
 new file mode 100644
 --- /dev/null
 +++ b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/cloudsync/CloudSyncManualSync.kt
-@@ -0,0 +1,5 @@
+@@ -0,0 +1,6 @@
 +package com.maxrave.simpmusic.cloudsync
 +
 +interface CloudSyncManualSync {
@@ -197,7 +191,7 @@ diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/expect/Cloud
 new file mode 100644
 --- /dev/null
 +++ b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.kt
-@@ -0,0 +1,5 @@
+@@ -0,0 +1,4 @@
 +package com.maxrave.simpmusic.expect
 +
 +expect fun requestManualCloudSync()
@@ -220,7 +214,7 @@ diff --git a/composeApp/src/jvmMain/kotlin/com/maxrave/simpmusic/expect/CloudSyn
 new file mode 100644
 --- /dev/null
 +++ b/composeApp/src/jvmMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.jvm.kt
-@@ -0,0 +1,3 @@
+@@ -0,0 +1,5 @@
 +package com.maxrave.simpmusic.expect
 +
 +actual fun requestManualCloudSync() = Unit
@@ -228,13 +222,13 @@ new file mode 100644
 diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/HomeScreen.kt b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/HomeScreen.kt
 --- a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/HomeScreen.kt
 +++ b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/HomeScreen.kt
-@@ -30,6 +30,7 @@
+@@ -30,4 +30,5 @@
  import androidx.compose.foundation.layout.width
  import androidx.compose.foundation.layout.widthIn
  import androidx.compose.foundation.layout.windowInsetsPadding
 +import androidx.compose.foundation.border
  import androidx.compose.foundation.lazy.LazyColumn
-@@ -150,6 +151,8 @@
+@@ -150,5 +150,7 @@
  import com.maxrave.simpmusic.ui.component.rememberHolderPainter
  import com.maxrave.simpmusic.ui.icon.Notifications
  import com.maxrave.simpmusic.ui.icon.Person
@@ -268,7 +262,7 @@ diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/ho
                      }
                  }
              }
-@@ -1219,6 +1234,28 @@
+@@ -1219,5 +1234,29 @@
  private const val CHIP_FADE_STEPS = 24
  
 +@Composable
