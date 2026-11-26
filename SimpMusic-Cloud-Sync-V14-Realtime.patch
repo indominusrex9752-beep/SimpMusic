@@ -25,6 +25,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
 +import io.github.jan.supabase.auth.status.SessionStatus
  import io.github.jan.supabase.createSupabaseClient
 +import io.github.jan.supabase.realtime.PostgresAction
+import io.github.jan.supabase.realtime.channel
 +import io.github.jan.supabase.realtime.Realtime
 +import io.github.jan.supabase.realtime.postgresChangeFlow
 +import io.github.jan.supabase.realtime.realtime
@@ -63,7 +64,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
 +            val session = (sessionStatus as? SessionStatus.Authenticated)?.session
 +                ?: return@collectLatest
 +            val userId = session.user?.id ?: return@collectLatest
-+            val channel = client.realtime.channel("simpcloud-playback-$userId") {}
++            val channel = client.channel("simpcloud-playback-$userId") {}
 +            val inserts = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
 +                table = "cloud_playback_events"
 +                filter = "user_id=eq.$userId"
