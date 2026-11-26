@@ -2,7 +2,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncS
 new file mode 100644
 --- /dev/null
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncSettingsSync.kt
-@@ -0,0 +1,246 @@
+@@ -0,0 +1,258 @@
 +package com.maxrave.simpmusic.cloudsync
 +
 +import android.content.Context
@@ -20,6 +20,7 @@ new file mode 100644
 +import kotlinx.coroutines.sync.Mutex
 +import kotlinx.coroutines.sync.withLock
 +import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.first
 +import org.json.JSONArray
 +import org.json.JSONObject
 +import java.io.IOException
@@ -226,14 +227,14 @@ new file mode 100644
 +        val CATEGORIES = listOf("audio_effects", "playback", "appearance", "general", "lyrics", "library", "notifications")
 +        val KEYS_BY_CATEGORY = mapOf(
 +            "audio_effects" to setOf(
-+                "quality", "download_quality", "video_download_quality", "normalize_volume", "skip_silent",
++                "quality", "download_quality", "video_download_quality", "video_quality", "normalize_volume", "skip_silent",
 +                "player_volume", "equalizer_autoeq_profile", "equalizer_bands", "equalizer_enabled",
 +                "equalizer_type", "equalizer_preamp", "delay_enabled", "delay_time_ms", "delay_feedback",
 +                "delay_mix", "reverb_enabled", "reverb_preset", "reverb_mix", "eight_d_enabled",
 +                "eight_d_direction", "eight_d_period_seconds",
 +            ),
 +            "playback" to setOf(
-+                "save_state_of_playback", "watch_video_instead_of_playing_audio", "radio_audio_only",
++                "save_state_of_playback", "radio_audio_only",
 +                "endless_queue", "playback_speed", "pitch", "kill_service_on_exit", "crossfade_enabled",
 +                "crossfade_duration", "crossfade_dj_mode", "crossfade_skip_album",
 +            ),
@@ -241,13 +242,13 @@ new file mode 100644
 +                "theme_mode", "theme_color_source", "custom_theme_color", "now_playing_style", "liquid_glass",
 +            ),
 +            "general" to setOf(
-+                "language", "location", "auto_check_for_updates", "update_channel", "explicit_content_enabled",
++                "location", "auto_check_for_updates", "update_channel", "explicit_content_enabled",
 +                "home_limit", "chart_key", "send_back_to_google",
 +            ),
 +            "lyrics" to setOf(
 +                "lyrics_provider", "translation_language", "use_translation_language", "use_ai_translation",
 +                "spotify_lyrics", "lyrics_style", "romanization_languages", "youtube_subtitle_language",
-+                "preferred_audio_language", "lyrics_offset_ms",
++                "preferred_audio_language",
 +            ),
 +            "library" to setOf(
 +                "sponsor_block_enabled", "radio_audio_only", "spotify_canvas", "am_animated_artwork",
@@ -260,3 +261,45 @@ new file mode 100644
 +        val ALL_KEYS = KEYS_BY_CATEGORY.values.flatten().toSet()
 +    }
 +}
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncModule.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncModule.kt
+--- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncModule.kt
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncModule.kt
+@@ -1,8 +1,12 @@
+ package com.maxrave.simpmusic.cloudsync
+ 
++import androidx.datastore.core.DataStore
++import androidx.datastore.preferences.core.Preferences
+ import com.maxrave.data.db.SyncDao
+ import org.koin.android.ext.koin.androidContext
+ import org.koin.dsl.module
+ 
+ val cloudSyncModule = module {
+     single { CloudSyncAuth() }
+     single { CloudSyncPlaybackSync(androidContext(), get(), get<SyncDao>()) }
++    single { CloudSyncSettingsSync(androidContext(), get(), get<DataStore<Preferences>>()) }
+ }
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
+--- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
+@@ -18,6 +18,7 @@ class CloudSyncWorker(
+ ) : CoroutineWorker(context, parameters), KoinComponent {
+     private val playbackSync: CloudSyncPlaybackSync by inject()
++    private val settingsSync: CloudSyncSettingsSync by inject()
+ 
+     override suspend fun doWork(): Result =
+         try {
+             playbackSync.syncNow()
++            settingsSync.syncNow()
+             Result.success()
+         } catch (error: Exception) {
+             if (runAttemptCount < 5) Result.retry() else Result.failure()
+@@ -39,6 +40,7 @@ class CloudSyncAutoSync(context: Context) : CloudSyncManualSync, KoinComponent {
+     private val playbackSync: CloudSyncPlaybackSync by inject()
++    private val settingsSync: CloudSyncSettingsSync by inject()
+     private val workManager = WorkManager.getInstance(context.applicationContext)
+@@ -61,6 +63,7 @@ class CloudSyncAutoSync(context: Context) : CloudSyncManualSync, KoinComponent {
+         manualSyncScope.launch {
+             try {
+                 val result = playbackSync.syncNow()
++                settingsSync.syncNow()
+                 onStatus("SimpCloud sync complete: ${result.uploaded} uploaded, ${result.downloaded} downloaded.")
