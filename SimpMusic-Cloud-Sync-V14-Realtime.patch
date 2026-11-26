@@ -109,19 +109,12 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncM
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
-@@ -29,7 +29,7 @@
-     }
+@@ -32,3 +32,3 @@
  }
  
 -class CloudSyncAutoSync(context: Context) {
 +class CloudSyncAutoSync(context: Context) : CloudSyncManualSync {
-     private val workManager = WorkManager.getInstance(context.applicationContext)
-     private val network = Constraints.Builder()
-         .setRequiredNetworkType(NetworkType.CONNECTED)
-@@ -38,8 +38,12 @@
- 
-     fun scheduleLaunchSync() = enqueueSync()
- 
+@@ -42,3 +42,7 @@
      fun schedulePlaybackSync() = enqueueSync()
  
 +    fun scheduleRealtimeSync() = enqueueSync()
@@ -134,26 +127,18 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
 diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
 --- a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
-@@ -24,10 +26,14 @@
- import com.maxrave.logger.Logger
- import com.maxrave.simpmusic.di.viewModelModule
- import com.maxrave.simpmusic.service.backup.AutoBackupScheduler
- import com.maxrave.simpmusic.service.sync.LibrarySyncScheduler
+@@ -26,2 +26,3 @@
  import com.maxrave.simpmusic.utils.NetworkFirstInterceptor
 +import com.maxrave.simpmusic.cloudsync.CloudSyncAuth
  import kotlinx.coroutines.CoroutineScope
- import kotlinx.coroutines.Dispatchers
+@@ -33,3 +34,6 @@
  import kotlinx.coroutines.SupervisorJob
 +import kotlinx.coroutines.CancellationException
 +import kotlinx.coroutines.delay
 +import kotlinx.coroutines.isActive
  import kotlinx.coroutines.launch
- import multiplatform.network.cmptoast.AppContext
-@@ -99,6 +104,21 @@
-                 .collect {
-                     cloudAutoSync.schedulePlaybackSync()
-                 }
-         }
+ import kotlinx.coroutines.flow.debounce
+@@ -102,1 +105,16 @@
 +        val cloudSyncAuth = get<CloudSyncAuth>()
 +        applicationScope.launch {
 +            while (isActive) {
@@ -169,7 +154,6 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication
 +                }
 +            }
 +        }
- 
          // Initialize and start AutoBackupScheduler
 diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/cloudsync/CloudSyncManualSync.kt b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/cloudsync/CloudSyncManualSync.kt
 new file mode 100644
