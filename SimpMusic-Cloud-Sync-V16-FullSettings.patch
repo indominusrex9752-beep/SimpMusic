@@ -305,3 +305,11 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
                  val result = playbackSync.syncNow()
 +                settingsSync.syncNow()
                  onStatus("SimpCloud sync complete: ${result.uploaded} uploaded, ${result.downloaded} downloaded.")
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
+--- a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
+@@ -90,3 +90,4 @@
+         val cloudAutoSync = CloudSyncAutoSync(this)
+         cloudAutoSync.scheduleLaunchSync()
++        cloudAutoSync.observeSettings(applicationScope)
+         applicationScope.launch {
