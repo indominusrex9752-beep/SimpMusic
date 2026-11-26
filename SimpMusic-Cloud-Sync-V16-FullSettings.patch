@@ -2,9 +2,10 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncS
 new file mode 100644
 --- /dev/null
 +++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncSettingsSync.kt
-@@ -0,0 +1,258 @@
+@@ -0,0 +1,259 @@
 +package com.maxrave.simpmusic.cloudsync
 +
++import com.maxrave.simpmusic.BuildKonfig
 +import android.content.Context
 +import androidx.datastore.core.DataStore
 +import androidx.datastore.preferences.core.Preferences
