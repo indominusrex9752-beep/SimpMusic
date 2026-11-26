@@ -1,4 +1,4 @@
-name: Build SimpMusic Debug APK V14 (Automatic Playback Sync)
+name: SimpMusic Debug APK V15 (SimpCloud Sync Improved)
 
 on:
   workflow_dispatch:
