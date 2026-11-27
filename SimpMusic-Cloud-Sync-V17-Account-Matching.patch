@@ -25,7 +25,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
 +    private val accountRepository: AccountRepository by inject()
 +
      val isConfigured: Boolean
-@@ -77,5 +85,23 @@
+@@ -77,5 +85,34 @@
          val userId = session.user?.id
              ?: client.auth.currentUserOrNull()?.id
              ?: return null
