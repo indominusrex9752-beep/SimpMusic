@@ -224,6 +224,13 @@ jobs:
           datasource = (root / "core/data/src/commonMain/kotlin/com/maxrave/data/db/datasource/AnalyticsDatasource.kt").read_text()
           if "stableSyncId" not in datasource or "syncRecorder.play(stableSyncId)" not in datasource:
               raise SystemExit("Checkpoint recovery is not connected to the existing history-sync event.")
+
+          analytics_api = (root / "core/domain/src/commonMain/kotlin/com/maxrave/domain/repository/AnalyticsRepository.kt").read_text()
+          if "syncId: String? = null" not in analytics_api or "timestamp: LocalDateTime? = null" not in analytics_api:
+              raise SystemExit("AnalyticsRepository does not accept stable event identity and original session time.")
+          analytics_impl = (root / "core/data/src/commonMain/kotlin/com/maxrave/data/repository/AnalyticsRepositoryImpl.kt").read_text()
+          if "                    syncId," not in analytics_impl or "                    timestamp," not in analytics_impl:
+              raise SystemExit("AnalyticsRepositoryImpl does not forward checkpoint identity and timestamp.")
           for handler_path in required[3:5]:
               handler = (root / handler_path).read_text()
               for marker in ("listeningRecoveryReady.await()", "persistListeningCheckpoint", "recoverListeningCheckpoint", "persistCompletedListeningSession"):
