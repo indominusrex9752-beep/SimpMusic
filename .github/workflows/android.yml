@@ -190,6 +190,17 @@ jobs:
           if '"ai_provider"' in settings_sync or '"custom_model_id"' in settings_sync:
               raise SystemExit("AI-provider settings were incorrectly added to cloud sync.")
 
+          settings_vm = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SettingsViewModel.kt")
+          for marker in ("val titleMarquee: StateFlow<Boolean>", "val animatedLyricsBackground: StateFlow<Boolean>", "val lyricsBackgroundPulse: StateFlow<Boolean>", "fun setTitleMarquee(", "fun setAnimatedLyricsBackground(", "fun setLyricsBackgroundPulse(", "ANIMATED_LYRICS_BACKGROUND_KEY", "LYRICS_BACKGROUND_PULSE_KEY"):
+              if marker not in settings_vm:
+                  raise SystemExit(f"Selected non-AI preference plumbing is missing: {marker}")
+          shared_vm = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SharedViewModel.kt")
+          if "fun getTitleMarquee()" not in shared_vm:
+              raise SystemExit("The selected title-marquee preference is not connected to the app theme.")
+          lyrics_background = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/LyricsFlowBackground.kt")
+          if "ANIMATED_LYRICS_BACKGROUND_KEY" not in lyrics_background or "LYRICS_BACKGROUND_PULSE_KEY" not in lyrics_background:
+              raise SystemExit("Animated lyrics background preferences are not wired.")
+
           app = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/App.kt")
           if "titleMarquee = titleMarquee" not in app or ("AnalyticsDestination" not in app and "InsightsDestination" not in app):
               raise SystemExit("The custom Insights app root or title-marquee preference is missing.")
