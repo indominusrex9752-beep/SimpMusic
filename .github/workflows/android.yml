@@ -131,7 +131,10 @@ jobs:
       - name: Verify upstream base
         run: |
           grep -q 'version-name = "2.7.0"' gradle/libs.versions.toml
-          test "$(git -C core rev-parse HEAD)" = "$(git ls-tree HEAD core | awk '{print $3}')"
+          CORE_BASE="$(git ls-tree HEAD core | awk '{print $3}')"
+          git -C core cat-file -e "$CORE_BASE^{commit}"
+          git -C core merge-base --is-ancestor "$CORE_BASE" HEAD
+          test "$(git -C core rev-parse HEAD)" = "$(git -C core rev-parse Version-Upgrade)"
 
       - name: Generate library definitions
         run: ./gradlew exportLibraryDefinitions
