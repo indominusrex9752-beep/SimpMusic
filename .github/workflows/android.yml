@@ -347,6 +347,15 @@ jobs:
         run: |
           cp v17-overlay/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/PlaylistViewModel.kt composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/PlaylistViewModel.kt
 
+      - name: Keep Insights recovery checkpoints device-local
+        run: |
+          SETTINGS_SYNC="androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncSettingsSync.kt"
+          grep -q 'it.key.name in KEYS_BY_CATEGORY.getValue(category)' "$SETTINGS_SYNC"
+          if grep -q 'analytics_active_listening_checkpoint_v1' "$SETTINGS_SYNC"; then
+            echo "::error::The unfinished local Insights checkpoint must never be copied between devices."
+            exit 1
+          fi
+
       - name: Verify upstream base
         run: |
           grep -q 'version-name = "2.7.0"' gradle/libs.versions.toml
