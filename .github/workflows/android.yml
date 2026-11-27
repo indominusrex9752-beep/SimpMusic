@@ -74,8 +74,8 @@ jobs:
           ]
           insights_strings_path = "composeApp/src/commonMain/composeResources/values/strings.xml"
           app_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/App.kt"
-          app_marquee_line = b"    val titleMarquee by viewModel.getTitleMarquee().collectAsStateWithLifecycle(true)\\n"
-          app_marquee_anchor = b"    val isLiquidGlassEnabled by viewModel.getEnableLiquidGlass().collectAsStateWithLifecycle(DataStoreManager.FALSE)\\n"
+          app_marquee_line = b"    val titleMarquee by viewModel.getTitleMarquee().collectAsStateWithLifecycle(true)\n"
+          app_marquee_anchor = b"    val isLiquidGlassEnabled by viewModel.getEnableLiquidGlass().collectAsStateWithLifecycle(DataStoreManager.FALSE)\n"
           with zipfile.ZipFile(archive) as patch, tempfile.TemporaryDirectory() as temp:
               temp = pathlib.Path(temp)
               for index, name in enumerate(patch.namelist()):
