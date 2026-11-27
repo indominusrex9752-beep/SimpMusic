@@ -242,6 +242,8 @@ jobs:
           sync_applier = (root / "core/data/src/commonMain/kotlin/com/maxrave/data/librarysync/SyncApplier.kt").read_text()
           if "getPlaybackEventBySyncId(event.syncId)" not in sync_applier or "existing.copy(listenedSecond = event.listenedSecond)" not in sync_applier:
               raise SystemExit("A retried history event cannot update its existing synced play.")
+          if "dao.updatePlaybackEvent(existing.copy(listenedSecond = event.listenedSecond))\n                // The host must log this newer version so already-paired devices receive it too.\n                return true" not in sync_applier:
+              raise SystemExit("A newer recovered play duration is not re-published to already-paired devices.")
           sync_dao = (root / "core/data/src/commonMain/kotlin/com/maxrave/data/db/SyncDao.kt").read_text()
           if "suspend fun getPlaybackEventBySyncId(syncId: String): PlaybackEventEntity?" not in sync_dao or "suspend fun updatePlaybackEvent(event: PlaybackEventEntity)" not in sync_dao:
               raise SystemExit("SyncApplier history upserts are missing their SyncDao methods.")
