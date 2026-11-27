@@ -187,6 +187,13 @@ jobs:
           view_model = (root / required[6]).read_text()
           if "LocalDate(2026, 11, 1)" not in view_model:
               raise SystemExit("All Time is not bounded from 1 November 2026.")
+          if "AnalyticsUiState.DayRange.THIS_MONTH" not in view_model:
+              raise SystemExit("This month is not configured as the Insights default.")
+
+          for handler_path in required[3:5]:
+              handler = (root / handler_path).read_text()
+              if "listeningAccumulator.tick" not in handler or "saveListeningSession" not in handler:
+                  raise SystemExit(f"Playback listening tracking is not wired into {handler_path}.")
 
           screen = (root / required[7]).read_text()
           if "CUSTOM_RANGE" not in screen or "DateRangePicker" not in screen:
