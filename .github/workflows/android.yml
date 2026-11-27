@@ -194,6 +194,11 @@ jobs:
           if "AnalyticsDestination" not in app:
               raise SystemExit("The Insights destination is not wired into the app.")
 
+          account_settings = root / "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt"
+          account_ui = account_settings.read_text()
+          if "it.googleEmail" not in account_ui or "SimpCloud matching unavailable" not in account_ui:
+              raise SystemExit("The selected YouTube account matching diagnostic is missing.")
+
           resources = root / "composeApp/src/commonMain/composeResources/values/strings.xml"
           ET.parse(resources)
           print("Insights merge checks passed: files, 30-second threshold, stall guard, date filters, navigation and XML.")
