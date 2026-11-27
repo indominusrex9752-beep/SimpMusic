@@ -145,11 +145,11 @@ jobs:
               source = source.replace(old, new, 1)
               null_song_old = "        if (currentSong == null) return null"
               null_song_new = """        if (currentSong == null) {
-                    // Do not let an interval without a verified current track accrue to the next tick.
-                    lastPositionMillis = positionMillis
-                    lastTick = TimeSource.Monotonic.markNow()
-                    return null
-                }"""
+            // Do not let an interval without a verified current track accrue to the next tick.
+            lastPositionMillis = positionMillis
+            lastTick = TimeSource.Monotonic.markNow()
+            return null
+        }"""
               if null_song_old not in source:
                   raise SystemExit("Could not find the expected null-song guard; refusing an unsafe edit.")
               source = source.replace(null_song_old, null_song_new, 1)
