@@ -3300,7 +3300,7 @@ fun SettingScreen(
                                     Column(Modifier.weight(1f)) {
                                         Text(it.name, style = typo().labelMedium, color = MaterialTheme.colorScheme.onBackground)
                                         Text(it.email, style = typo().bodySmall)
-                                        if (it.isUsed) {
+                                        if (it.isUsed && getPlatform() == Platform.Android) {
                                             val selectedGoogleEmail = selectedYouTubeGoogleEmail?.trim()?.takeIf { email -> email.isNotBlank() }
                                             Text(
                                                 text = selectedGoogleEmail?.let { email ->
