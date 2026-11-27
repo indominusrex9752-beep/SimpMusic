@@ -146,6 +146,59 @@ jobs:
           print("Duplicate import removed; stalled-position intervals are excluded.")
           PY
 
+      - name: Validate merged Insights implementation
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import xml.etree.ElementTree as ET
+
+          root = pathlib.Path(".")
+          required = [
+              "core/data/src/commonMain/kotlin/com/maxrave/data/mediaservice/PlaybackListeningAccumulator.kt",
+              "core/data/src/commonMain/kotlin/com/maxrave/data/repository/AnalyticsRepositoryImpl.kt",
+              "core/data/src/commonMain/kotlin/DatabaseDao.kt",
+              "core/data/src/androidMain/kotlin/com/maxrave/data/mediaservice/MediaServiceHandlerImpl.kt",
+              "core/data/src/jvmMain/kotlin/com/maxrave/data/mediaservice/JvmMediaPlayerHandlerImpl.kt",
+              "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/App.kt",
+              "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/AnalyticsViewModel.kt",
+              "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/analytics/AnalyticsScreen.kt",
+              "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/analytics/AnalyticsFormat.kt",
+          ]
+          missing = [path for path in required if not (root / path).is_file()]
+          if missing:
+              raise SystemExit("Missing merged Insights files: " + ", ".join(missing))
+
+          accumulator = (root / required[0]).read_text()
+          expected_guard = "positionDelta >= (elapsedMillis / 10L).coerceAtLeast(1L)"
+          if expected_guard not in accumulator:
+              raise SystemExit("Playback tracker still accepts a zero-progress stall.")
+
+          repository = (root / required[1]).read_text()
+          duplicate_import = "import kotlinx.coroutines.withContext"
+          if repository.splitlines().count(duplicate_import) != 1:
+              raise SystemExit("AnalyticsRepositoryImpl must contain exactly one withContext import.")
+
+          dao = (root / required[2]).read_text()
+          if "listenedSecond >= 30" not in dao:
+              raise SystemExit("The 30-second complete-play threshold is missing.")
+
+          view_model = (root / required[6]).read_text()
+          if "LocalDate(2026, 11, 1)" not in view_model:
+              raise SystemExit("All Time is not bounded from 1 November 2026.")
+
+          screen = (root / required[7]).read_text()
+          if "CUSTOM_RANGE" not in screen or "DateRangePicker" not in screen:
+              raise SystemExit("Custom date-range filtering is incomplete.")
+
+          app = (root / required[5]).read_text()
+          if "AnalyticsDestination" not in app:
+              raise SystemExit("The Insights destination is not wired into the app.")
+
+          resources = root / "composeApp/src/commonMain/composeResources/values/strings.xml"
+          ET.parse(resources)
+          print("Insights merge checks passed: files, 30-second threshold, stall guard, date filters, navigation and XML.")
+          PY
+
       - name: Configure build and Supabase
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
