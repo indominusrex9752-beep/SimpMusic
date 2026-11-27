@@ -66,7 +66,9 @@ def edit(path: str, transform) -> None:
     target.write_text(updated)
 
 # Refuse to run against a different base or silently omit a selected feature.
-if any("analytics" in path.lower() or "insights" in path.lower() for path in FEATURE_PATHS):\n    raise SystemExit("Analytics/Insights source files must never be imported from 2.7.")\nrun(["git", "cat-file", "-e", f"{BASE}^{{commit}}"])
+if any("analytics" in path.lower() or "insights" in path.lower() for path in FEATURE_PATHS):
+    raise SystemExit("Analytics/Insights source files must never be imported from 2.7.")
+run(["git", "cat-file", "-e", f"{BASE}^{{commit}}"])
 run(["git", "cat-file", "-e", f"{UPGRADE}^{{commit}}"])
 diff = run(
     ["git", "diff", "--binary", "--no-ext-diff", BASE, UPGRADE, "--", *FEATURE_PATHS],
