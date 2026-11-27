@@ -1,0 +1,50 @@
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
+--- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
+@@
+ import android.content.Intent
++import com.maxrave.domain.manager.DataStoreManager
++import com.maxrave.domain.repository.AccountRepository
+ import com.maxrave.simpmusic.BuildKonfig
+@@
+ import kotlinx.coroutines.launch
++import kotlinx.coroutines.flow.first
++import org.koin.core.component.KoinComponent
++import org.koin.core.component.inject
+@@
+-class CloudSyncAuth {
++class CloudSyncAuth : KoinComponent {
++    private val dataStoreManager: DataStoreManager by inject()
++    private val accountRepository: AccountRepository by inject()
++
+@@
+     suspend fun cloudCredentials(): CloudCredentials? {
+         if (!isConfigured) return null
+         client.auth.refreshCurrentSession()
+         val session = client.auth.currentSessionOrNull() ?: return null
+         val userId = session.user?.id
+             ?: client.auth.currentUserOrNull()?.id
+             ?: return null
++        val cloudEmail = authenticatedEmail()?.trim()?.takeIf { it.isNotBlank() }
++            ?: throw IllegalStateException("Google sign-in did not provide an email. SimpCloud sync must remain disabled.")
++
++        // Match the active YouTube identity, not merely any account stored in the app.
++        // Both page ID and authuser index are required because one Google login can own
++        // multiple YouTube channels and multiple Google accounts can share one cookie jar.
++        val cookie = dataStoreManager.cookie.first()
++        val selectedPageId = dataStoreManager.pageId.first()
++        val selectedAuthUser = dataStoreManager.authUser.first()
++        if (cookie.isBlank() || selectedPageId.isBlank()) {
++            throw IllegalStateException("The selected YouTube account has no page ID. SimpCloud sync must remain disabled.")
++        }
++
++        val selectedAccount = accountRepository.getAccountInfo(cookie).first()
++            .firstOrNull { it.pageId == selectedPageId && it.authUser == selectedAuthUser }
++            ?: throw IllegalStateException("The selected YouTube account could not be matched safely. SimpCloud sync must remain disabled.")
++        val youtubeEmail = selectedAccount.googleEmail?.trim()?.takeIf { it.contains("@") }
++            ?: throw IllegalStateException("The selected account was found, but YouTube did not provide its Google email. Sync must remain disabled.")
++        if (!youtubeEmail.equals(cloudEmail, ignoreCase = true)) {
++            throw IllegalStateException("The SimpCloud Google account does not match the selected YouTube account. Sync must remain disabled.")
++        }
+         return CloudCredentials(userId, session.accessToken)
+     }
