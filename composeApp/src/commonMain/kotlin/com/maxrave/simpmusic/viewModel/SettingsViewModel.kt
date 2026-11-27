@@ -1577,9 +1577,11 @@ class SettingsViewModel(
 
     private val _selectedYouTubeGoogleEmail = MutableStateFlow<String?>(null)
     val selectedYouTubeGoogleEmail: StateFlow<String?> = _selectedYouTubeGoogleEmail
+    private var selectedYouTubeIdentityJob: Job? = null
 
     private fun refreshSelectedYouTubeGoogleEmail() {
-        viewModelScope.launch {
+        selectedYouTubeIdentityJob?.cancel()
+        selectedYouTubeIdentityJob = viewModelScope.launch {
             _selectedYouTubeGoogleEmail.value = null
             val email = try {
                 val cookie = dataStoreManager.cookie.first()
