@@ -381,6 +381,15 @@ jobs:
             exit 1
           fi
 
+      - name: Final source hygiene after all custom patches
+        run: |
+          git diff --check
+          git -C core diff --check
+          if grep -R -n -E '^(<<<<<<< |=======|>>>>>>> )' androidApp composeApp core/data core/domain --include='*.kt' --include='*.kts' --include='*.xml'; then
+            echo "::error::Unresolved merge markers remain after custom patch application."
+            exit 1
+          fi
+
       - name: Verify upstream base
         run: |
           grep -q 'version-name = "2.7.0"' gradle/libs.versions.toml
