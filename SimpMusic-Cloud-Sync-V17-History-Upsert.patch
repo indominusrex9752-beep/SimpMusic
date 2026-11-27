@@ -1,5 +1,4 @@
 diff --git a/data/src/commonMain/kotlin/com/maxrave/data/db/SyncDao.kt b/data/src/commonMain/kotlin/com/maxrave/data/db/SyncDao.kt
-index 0000000..0000000 100644
 --- a/data/src/commonMain/kotlin/com/maxrave/data/db/SyncDao.kt
 +++ b/data/src/commonMain/kotlin/com/maxrave/data/db/SyncDao.kt
 @@ -4,6 +4,7 @@ import androidx.room.Insert
