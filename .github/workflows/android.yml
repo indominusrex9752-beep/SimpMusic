@@ -164,6 +164,11 @@ jobs:
           python3 -m py_compile v17-overlay/apply_crash_safe_insights.py
           python3 v17-overlay/apply_crash_safe_insights.py
 
+      - name: Add idempotent synced playback history DAO operations
+        run: |
+          git apply --check SimpMusic-Cloud-Sync-V17-History-Upsert.patch
+          git apply SimpMusic-Cloud-Sync-V17-History-Upsert.patch
+
       - name: Validate merged Insights implementation
         run: |
           python3 - <<'PY'
@@ -229,6 +234,9 @@ jobs:
           sync_applier = (root / "core/data/src/commonMain/kotlin/com/maxrave/data/librarysync/SyncApplier.kt").read_text()
           if "getPlaybackEventBySyncId(event.syncId)" not in sync_applier or "existing.copy(listenedSecond = event.listenedSecond)" not in sync_applier:
               raise SystemExit("A retried history event cannot update its existing synced play.")
+          sync_dao = (root / "core/data/src/commonMain/kotlin/com/maxrave/data/db/SyncDao.kt").read_text()
+          if "suspend fun getPlaybackEventBySyncId(syncId: String): PlaybackEventEntity?" not in sync_dao or "suspend fun updatePlaybackEvent(event: PlaybackEventEntity)" not in sync_dao:
+              raise SystemExit("SyncApplier history upserts are missing their SyncDao methods.")
 
           analytics_api = (root / "core/domain/src/commonMain/kotlin/com/maxrave/domain/repository/AnalyticsRepository.kt").read_text()
           if "syncId: String? = null" not in analytics_api or "timestamp: LocalDateTime? = null" not in analytics_api:
@@ -335,10 +343,6 @@ jobs:
           git apply --check SimpMusic-Cloud-Sync-V17-Account-Matching.patch
           git apply SimpMusic-Cloud-Sync-V17-Account-Matching.patch
 
-      - name: Add idempotent synced playback history updates
-        run: |
-          git apply --check SimpMusic-Cloud-Sync-V17-History-Upsert.patch
-          git apply SimpMusic-Cloud-Sync-V17-History-Upsert.patch
 
       - name: Apply SimpCloud V15 immediate manual sync
         run: |
