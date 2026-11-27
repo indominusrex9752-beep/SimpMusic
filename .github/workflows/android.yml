@@ -1,166 +1,148 @@
-name: Build release APK (FOSS)
+name: SimpMusic Debug APK V17 (Version Upgrade 2.7)
+
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - 'dev'
-    paths-ignore:
-      - 'README.md'
-      - 'fastlane/**'
-      - 'assets/**'
-      - '.github/**/*.md'
-      - '.github/FUNDING.yml'
-      - '.github/ISSUE_TEMPLATE/**'
-  pull_request:
-    branches: [ dev ]
-    paths-ignore:
-      - 'README.md'
-      - 'fastlane/**'
-      - 'assets/**'
-      - '.github/**/*.md'
-      - '.github/FUNDING.yml'
-      - '.github/ISSUE_TEMPLATE/**'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: 'recursive'
 
-      - name: set up JDK 21
+    steps:
+      - name: Checkout SimpMusic
+        uses: actions/checkout@v6
+        with:
+          ref: Version-Upgrade
+          submodules: recursive
+
+      - name: Use SimpCloud core
+        run: |
+          git submodule set-url core https://github.com/indominusrex9752-beep/core.git
+          git -C core fetch origin Version-Upgrade
+          git -C core checkout FETCH_HEAD
+
+      - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
           java-version: 21
-          distribution: "microsoft"
-          cache: 'gradle'
+          distribution: microsoft
+          cache: gradle
 
-      - name: Update build product flavor
+      - name: Validate and apply Insights overlay
         run: |
-          echo "" >> ./gradle.properties
-          echo "isFullBuild=true" >> ./gradle.properties
+          python3 - <<'PY'
+          import subprocess
+          import sys
+          import zipfile
 
-      - name: Update Sentry Secrets
+          archive = "SimpMusic-Insights-stage1-patch.zip"
+          upstream_base = "140673ab2f2b83d5a2264d3a5f51f1dce3ab6b05"
+          upstream_head = "30a8614ab5849f0d7f33b29b8292c04a532d5898"
+
+          with zipfile.ZipFile(archive) as patch:
+              overlay_paths = {
+                  name.rstrip("/")
+                  for name in patch.namelist()
+                  if name and not name.endswith("/")
+              }
+
+              subprocess.run(
+                  ["git", "fetch", "https://github.com/maxrave-dev/SimpMusic.git", upstream_base],
+                  check=True,
+              )
+              changed_paths = set(
+                  subprocess.check_output(
+                      ["git", "diff", "--name-only", upstream_base, upstream_head],
+                      text=True,
+                  ).splitlines()
+              )
+              conflicts = sorted(overlay_paths & changed_paths)
+
+              print("Insights overlay files:", len(overlay_paths))
+              print("Upstream 2.7.0 changed files:", len(changed_paths))
+              if conflicts:
+                  print("::error::Insights overlay touches files changed by upstream 2.7.0:")
+                  for path in conflicts:
+                      print(f" - {path}")
+                  sys.exit(1)
+
+              patch.extractall(".")
+              print("Insights overlay applied without overwriting upstream 2.7.0 files.")
+          PY
+
+      - name: Configure build and Supabase
         env:
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
         run: |
-          echo 'SENTRY_DSN=${{ secrets.SENTRY_DSN }}' > ./local.properties
-          echo "SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}" >> ./local.properties
+          echo "isFullBuild=true" >> gradle.properties
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "::error::Missing Supabase GitHub secrets."
+            exit 1
+          fi
+          printf 'SUPABASE_URL=%s\n' "$SUPABASE_URL" >> local.properties
+          printf 'SUPABASE_PUBLISHABLE_KEY=%s\n' "$SUPABASE_PUBLISHABLE_KEY" >> local.properties
 
-      - name: Update Last.fm secrets
-        env:
-          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
-          LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
-          DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
+      - name: Apply SimpCloud Google OAuth foundation
         run: |
-          echo "LASTFM_API_KEY=${{ secrets.LASTFM_API_KEY }}" >> ./local.properties
-          echo "LASTFM_SECRET=${{ secrets.LASTFM_SECRET }}" >> ./local.properties
-          echo "DISCORD_CLIENT_ID=${{ secrets.DISCORD_CLIENT_ID }}" >> ./local.properties
+          git apply --check SimpMusic-Cloud-Sync-Auth-Stage1.patch
+          git apply SimpMusic-Cloud-Sync-Auth-Stage1.patch
 
-      - name: Generate aboutLibraries.json
+      - name: Apply SimpCloud 2.7-compatible interface foundation
+        run: |
+          git apply --check SimpMusic-Cloud-Sync-Stage2-UI-2.7.patch
+          git apply SimpMusic-Cloud-Sync-Stage2-UI-2.7.patch
+          git apply --check SimpMusic-Cloud-Sync-Stage2-UI-2.7-Integration.patch
+          git apply SimpMusic-Cloud-Sync-Stage2-UI-2.7-Integration.patch
+
+      - name: Apply SimpCloud playback sync
+        run: |
+          git apply --check SimpMusic-Cloud-Sync-V13-Playback.patch
+          git apply SimpMusic-Cloud-Sync-V13-Playback.patch
+
+      - name: Apply SimpCloud V14 automatic sync
+        run: |
+          git apply --check SimpMusic-Cloud-Sync-V14-AutoSync.patch
+          git apply SimpMusic-Cloud-Sync-V14-AutoSync.patch
+
+      - name: Apply SimpCloud V14 realtime and manual sync
+        run: |
+          git apply --check SimpMusic-Cloud-Sync-V14-Realtime.patch
+          git apply SimpMusic-Cloud-Sync-V14-Realtime.patch
+
+      - name: Apply SimpCloud V15 immediate manual sync
+        run: |
+          git apply --check SimpMusic-Cloud-Sync-V15-ManualSync.patch
+          git apply SimpMusic-Cloud-Sync-V15-ManualSync.patch
+
+      - name: Apply SimpCloud V16 full settings sync
+        run: |
+          git apply --check SimpMusic-Cloud-Sync-V16-FullSettings.patch
+          git apply SimpMusic-Cloud-Sync-V16-FullSettings.patch
+
+      - name: Add 2.7 settings to cloud sync
+        run: |
+          git apply --check SimpMusic-Cloud-Sync-V17-Settings-Keys.patch
+          git apply SimpMusic-Cloud-Sync-V17-Settings-Keys.patch
+
+      - name: Preserve complete YouTube playlist shuffle
+        run: |
+          cp v17-overlay/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/PlaylistViewModel.kt composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/PlaylistViewModel.kt
+
+      - name: Verify upstream base
+        run: |
+          grep -q 'version-name = "2.7.0"' gradle/libs.versions.toml
+          test "$(git -C core rev-parse HEAD)" = "$(git ls-tree HEAD core | awk '{print $3}')"
+
+      - name: Generate library definitions
         run: ./gradlew exportLibraryDefinitions
 
-      - name: Build release APK
-        run: ./gradlew androidApp:assembleRelease
+      - name: Build debug APK
+        run: ./gradlew -PisFullBuild=true androidApp:assembleDebug
 
-      - name: Check build-tools version
-        shell: bash
-        run: |
-          BUILD_TOOL_VERSION=$(ls /usr/local/lib/android/sdk/build-tools/ | tail -n 1)
-          echo "BUILD_TOOL_VERSION=$BUILD_TOOL_VERSION" >> $GITHUB_ENV
-          echo Last build tool version is: $BUILD_TOOL_VERSION
-
-      # A pull request from a fork gets no secrets, so it only checks that the APK builds.
-      - uses: kevin-david/zipalign-sign-android-release@v2
-        id: sign_app
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        with:
-          releaseDirectory: androidApp/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
-          alias: ${{ secrets.ALIAS }}
-          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
-          keyPassword: ${{ secrets.KEY_PASSWORD }}
-          zipAlign: true
-        env:
-            BUILD_TOOLS_VERSION: ${{ env.BUILD_TOOL_VERSION }}
-
-      - name: Upload APK
-        if: steps.sign_app.outcome == 'success'
+      - name: Upload ARM64 APK
         uses: actions/upload-artifact@v4
         with:
-          name: app
-          path: androidApp/build/outputs/apk/release/*-signed.apk
-
-  # SimpMusic for vivo (vivoAndroidApp, com.spotify.music), same Full build as above.
-  build-vivo:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: 'recursive'
-
-      - name: set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: 21
-          distribution: "microsoft"
-          cache: 'gradle'
-
-      - name: Update build product flavor
-        run: |
-          echo "" >> ./gradle.properties
-          echo "isFullBuild=true" >> ./gradle.properties
-
-      - name: Update Sentry Secrets
-        env:
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: |
-          echo 'SENTRY_DSN=${{ secrets.SENTRY_DSN }}' > ./local.properties
-          echo "SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}" >> ./local.properties
-
-      - name: Update Last.fm secrets
-        env:
-          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
-          LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
-          DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
-        run: |
-          echo "LASTFM_API_KEY=${{ secrets.LASTFM_API_KEY }}" >> ./local.properties
-          echo "LASTFM_SECRET=${{ secrets.LASTFM_SECRET }}" >> ./local.properties
-          echo "DISCORD_CLIENT_ID=${{ secrets.DISCORD_CLIENT_ID }}" >> ./local.properties
-
-      - name: Generate aboutLibraries.json
-        run: ./gradlew exportLibraryDefinitions
-
-      - name: Build vivo release APK
-        run: ./gradlew vivoAndroidApp:assembleRelease
-
-      - name: Check build-tools version
-        shell: bash
-        run: |
-          BUILD_TOOL_VERSION=$(ls /usr/local/lib/android/sdk/build-tools/ | tail -n 1)
-          echo "BUILD_TOOL_VERSION=$BUILD_TOOL_VERSION" >> $GITHUB_ENV
-          echo Last build tool version is: $BUILD_TOOL_VERSION
-
-      # A pull request from a fork gets no secrets, so it only checks that the APK builds.
-      - uses: kevin-david/zipalign-sign-android-release@v2
-        id: sign_app
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        with:
-          releaseDirectory: vivoAndroidApp/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
-          alias: ${{ secrets.ALIAS }}
-          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
-          keyPassword: ${{ secrets.KEY_PASSWORD }}
-          zipAlign: true
-        env:
-            BUILD_TOOLS_VERSION: ${{ env.BUILD_TOOL_VERSION }}
-
-      - name: Upload APK
-        if: steps.sign_app.outcome == 'success'
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-vivo
-          path: vivoAndroidApp/build/outputs/apk/release/*-signed.apk
+          name: SimpMusic-Version-Upgrade-V17-Debug
+          path: androidApp/build/outputs/apk/debug/*arm64-v8a*.apk
+          if-no-files-found: error
+          compression-level: 0

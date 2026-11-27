@@ -1,0 +1,110 @@
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncPlaybackSync.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncPlaybackSync.kt
+--- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncPlaybackSync.kt
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncPlaybackSync.kt
+@@ -7,5 +7,7 @@
+ import com.maxrave.simpmusic.BuildKonfig
+ import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.sync.Mutex
++import kotlinx.coroutines.sync.withLock
+ import kotlinx.coroutines.withContext
+ import kotlinx.datetime.TimeZone
+ import kotlinx.datetime.toInstant
+@@ -30,8 +32,10 @@
+ ) {
+     private val preferences =
+         context.applicationContext.getSharedPreferences("simpcloud_device", Context.MODE_PRIVATE)
++    private val syncMutex = Mutex()
+ 
+-    suspend fun syncNow(): CloudSyncResult = withContext(Dispatchers.IO) {
++    suspend fun syncNow(): CloudSyncResult = syncMutex.withLock {
++        withContext(Dispatchers.IO) {
+         val credentials = auth.cloudCredentials()
+             ?: throw IllegalStateException("Connect your Google account before syncing.")
+         val deviceKey = deviceKey()
+@@ -134,6 +138,7 @@
+             "return=minimal",
+         )
+         CloudSyncResult(uploaded, downloaded)
++        }
+     }
+ 
+     private fun registerDevice(userId: String, token: String, deviceKey: String): String {
+diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/cloudsync/CloudSyncManualSync.kt b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/cloudsync/CloudSyncManualSync.kt
+--- a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/cloudsync/CloudSyncManualSync.kt
++++ b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/cloudsync/CloudSyncManualSync.kt
+@@ -1,5 +1,6 @@
+ package com.maxrave.simpmusic.cloudsync
+ 
+ interface CloudSyncManualSync {
+     fun scheduleManualSync()
++    fun syncManual(onStatus: (String) -> Unit)
+ }
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
+--- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAutoSync.kt
+@@ -10,4 +10,10 @@ import androidx.work.OneTimeWorkRequestBuilder
+ import androidx.work.WorkManager
+ import androidx.work.WorkerParameters
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.SupervisorJob
++import kotlinx.coroutines.launch
++import java.util.concurrent.atomic.AtomicBoolean
+ import org.koin.core.component.KoinComponent
+ import org.koin.core.component.inject
+@@ -30,5 +37,8 @@ class CloudSyncWorker(
+-class CloudSyncAutoSync(context: Context) : CloudSyncManualSync {
++class CloudSyncAutoSync(context: Context) : CloudSyncManualSync, KoinComponent {
++    private val playbackSync: CloudSyncPlaybackSync by inject()
+     private val workManager = WorkManager.getInstance(context.applicationContext)
++    private val manualSyncInProgress = AtomicBoolean(false)
++    private val manualSyncScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+     private val network = Constraints.Builder()
+         .setRequiredNetworkType(NetworkType.CONNECTED)
+         .build()
+@@ -42,4 +54,25 @@ class CloudSyncAutoSync(context: Context) : CloudSyncManualSync {
+ 
+     override fun scheduleManualSync() = enqueueSync()
+ 
++    override fun syncManual(onStatus: (String) -> Unit) {
++        if (!manualSyncInProgress.compareAndSet(false, true)) {
++            onStatus("A SimpCloud sync is already running.")
++            return
++        }
++        onStatus("SimpCloud: Syncing now…")
++        manualSyncScope.launch {
++            try {
++                val result = playbackSync.syncNow()
++                onStatus("SimpCloud sync complete: ${result.uploaded} uploaded, ${result.downloaded} downloaded.")
++            } catch (error: CancellationException) {
++                throw error
++            } catch (error: Exception) {
++                val message = error.message?.take(150) ?: "Please try again."
++                onStatus("SimpCloud sync failed: $message")
++            } finally {
++                manualSyncInProgress.set(false)
++            }
++        }
++    }
++
+     private fun enqueueSync() {
+diff --git a/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.android.kt b/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.android.kt
+--- a/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.android.kt
++++ b/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.android.kt
+@@ -1,8 +1,13 @@
+ package com.maxrave.simpmusic.expect
+ 
+-import com.maxrave.simpmusic.cloudsync.CloudSyncManualSync
++import android.content.Context
++import android.widget.Toast
++import com.maxrave.simpmusic.cloudsync.CloudSyncManualSync
+ import org.koin.mp.KoinPlatform.getKoin
+ 
+ actual fun requestManualCloudSync() {
+-    getKoin().get<CloudSyncManualSync>().scheduleManualSync()
++    val context: Context = getKoin().get()
++    getKoin().get<CloudSyncManualSync>().syncManual { message ->
++        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
++    }
+ }

@@ -1,0 +1,257 @@
+diff --git a/androidApp/build.gradle.kts b/androidApp/build.gradle.kts
+--- a/androidApp/build.gradle.kts
++++ b/androidApp/build.gradle.kts
+@@ -157,6 +157,7 @@
+ dependencies {
+     // Supabase Auth (PKCE + Android deep-link callback)
+     implementation("io.github.jan-tennert.supabase:auth-kt:3.9.0")
++    implementation("io.github.jan-tennert.supabase:realtime-kt:3.9.0")
+     implementation(libs.ktor.client.okhttp)
+     coreLibraryDesugaring(libs.desugaring)
+     val debugImplementation = "debugImplementation"
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
+--- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
+@@ -1,13 +1,26 @@
+ package com.maxrave.simpmusic.cloudsync
+ 
+ import android.content.Intent
+ import com.maxrave.simpmusic.BuildKonfig
+ import io.github.jan.supabase.auth.Auth
+ import io.github.jan.supabase.auth.FlowType
+ import io.github.jan.supabase.auth.auth
+ import io.github.jan.supabase.auth.handleDeeplinks
+ import io.github.jan.supabase.auth.providers.Google
++import io.github.jan.supabase.auth.status.SessionStatus
+ import io.github.jan.supabase.createSupabaseClient
++import io.github.jan.supabase.realtime.PostgresAction
++import io.github.jan.supabase.realtime.channel
++import io.github.jan.supabase.realtime.Realtime
++import io.github.jan.supabase.realtime.postgresChangeFlow
++import io.github.jan.supabase.realtime.realtime
++import kotlinx.coroutines.awaitCancellation
++import kotlinx.coroutines.coroutineScope
++import kotlinx.coroutines.flow.collect
++import kotlinx.coroutines.flow.collectLatest
++import kotlinx.coroutines.flow.debounce
++import kotlinx.coroutines.flow.filter
++import kotlinx.coroutines.launch
+ 
+ /**
+  * Android-only Supabase authentication boundary.
+@@ -31,6 +42,9 @@
+                 host = CALLBACK_HOST
+                 flowType = FlowType.PKCE
+             }
++            install(Realtime) {
++                accessToken = { auth.currentSessionOrNull()?.accessToken }
++            }
+         }
+     }
+ 
+@@ -73,6 +87,48 @@
+         return CloudCredentials(userId, session.accessToken)
+     }
+ 
++    /**
++     * Keeps a user-scoped Postgres Changes subscription alive for the active SimpCloud session.
++     * The connected callback performs a catch-up sync after every socket reconnect, so events
++     * missed while offline are recovered without polling the database.
++     */
++    suspend fun observePlaybackChanges(onPlaybackInserted: () -> Unit) {
++        if (!isConfigured) return
++        client.auth.sessionStatus.collectLatest { sessionStatus ->
++            val session = (sessionStatus as? SessionStatus.Authenticated)?.session
++                ?: return@collectLatest
++            val userId = session.user?.id ?: return@collectLatest
++            val channel = client.channel("simpcloud-playback-$userId") {}
++            val inserts = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
++                table = "cloud_playback_events"
++                filter = "user_id=eq.$userId"
++            }
++
++            coroutineScope {
++                val insertJob = launch {
++                    inserts.debounce(1_000).collect { onPlaybackInserted() }
++                }
++                val reconnectJob = launch {
++                    client.realtime.status
++                        .filter { it == Realtime.Status.CONNECTED }
++                        .collect {
++                            client.realtime.setAuth()
++                            onPlaybackInserted()
++                        }
++                }
++                try {
++                    client.realtime.setAuth(session.accessToken)
++                    channel.subscribe()
++                    awaitCancellation()
++                } finally {
++                    insertJob.cancel()
++                    reconnectJob.cancel()
++                    runCatching { client.realtime.removeChannel(channel) }
++                }
++            }
++        }
++    }
++
+     suspend fun signOut() {
+         if (isConfigured) client.auth.signOut()
+     }
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncModule.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncModule.kt
+--- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncModule.kt
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncModule.kt
+@@ -8,4 +8,5 @@
+ val cloudSyncModule = module {
+     single { CloudSyncAuth() }
+     single { CloudSyncPlaybackSync(androidContext(), get(), get<SyncDao>()) }
++    single<CloudSyncManualSync> { CloudSyncAutoSync(androidContext()) }
+ }
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
+--- a/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/SimpMusicApplication.kt
+@@ -26,2 +26,3 @@
+ import com.maxrave.simpmusic.utils.NetworkFirstInterceptor
++import com.maxrave.simpmusic.cloudsync.CloudSyncAuth
+ import kotlinx.coroutines.CoroutineScope
+@@ -33,3 +34,6 @@
+ import kotlinx.coroutines.SupervisorJob
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.isActive
+ import kotlinx.coroutines.launch
+ import kotlinx.coroutines.flow.debounce
+@@ -102,1 +105,16 @@
++        val cloudSyncAuth = get<CloudSyncAuth>()
++        applicationScope.launch {
++            while (isActive) {
++                try {
++                    cloudSyncAuth.observePlaybackChanges {
++                        cloudAutoSync.scheduleRealtimeSync()
++                    }
++                } catch (error: CancellationException) {
++                    throw error
++                } catch (error: Exception) {
++                    Log.e("SimpCloud", "Realtime listener stopped; retrying", error)
++                    delay(5_000)
++                }
++            }
++        }
+         // Initialize and start AutoBackupScheduler
+diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/cloudsync/CloudSyncManualSync.kt b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/cloudsync/CloudSyncManualSync.kt
+new file mode 100644
+--- /dev/null
++++ b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/cloudsync/CloudSyncManualSync.kt
+@@ -0,0 +1,6 @@
++package com.maxrave.simpmusic.cloudsync
++
++interface CloudSyncManualSync {
++    fun scheduleManualSync()
++}
++
+diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.kt b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.kt
+new file mode 100644
+--- /dev/null
++++ b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.kt
+@@ -0,0 +1,4 @@
++package com.maxrave.simpmusic.expect
++
++expect fun requestManualCloudSync()
++
+diff --git a/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.android.kt b/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.android.kt
+new file mode 100644
+--- /dev/null
++++ b/composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.android.kt
+@@ -0,0 +1,9 @@
++package com.maxrave.simpmusic.expect
++
++import com.maxrave.simpmusic.cloudsync.CloudSyncManualSync
++import org.koin.mp.KoinPlatform.getKoin
++
++actual fun requestManualCloudSync() {
++    getKoin().get<CloudSyncManualSync>().scheduleManualSync()
++}
++
+diff --git a/composeApp/src/jvmMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.jvm.kt b/composeApp/src/jvmMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.jvm.kt
+new file mode 100644
+--- /dev/null
++++ b/composeApp/src/jvmMain/kotlin/com/maxrave/simpmusic/expect/CloudSyncManualSync.jvm.kt
+@@ -0,0 +1,4 @@
++package com.maxrave.simpmusic.expect
++
++actual fun requestManualCloudSync() = Unit
++
+diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/HomeScreen.kt b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/HomeScreen.kt
+--- a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/HomeScreen.kt
++++ b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/HomeScreen.kt
+@@ -30,4 +30,5 @@
+ import androidx.compose.foundation.layout.width
+ import androidx.compose.foundation.layout.widthIn
+ import androidx.compose.foundation.layout.windowInsetsPadding
++import androidx.compose.foundation.border
+ import androidx.compose.foundation.lazy.LazyColumn
+@@ -150,5 +150,7 @@
+ import com.maxrave.simpmusic.ui.component.rememberHolderPainter
+ import com.maxrave.simpmusic.ui.icon.Notifications
+ import com.maxrave.simpmusic.ui.icon.Person
++import com.maxrave.simpmusic.ui.icon.Sync
+ import com.maxrave.simpmusic.ui.icon.SimpIcons
++import com.maxrave.simpmusic.expect.requestManualCloudSync
+ import com.maxrave.simpmusic.ui.navigation.destination.home.HomeDestination
+@@ -1157,11 +1160,23 @@
+                             }
+                             if (!createPinned) {
+-                                Box(Modifier.padding(start = 8.dp)) { createActions() }
++                                Row(
++                                    modifier = Modifier.padding(start = 8.dp),
++                                    verticalAlignment = Alignment.CenterVertically,
++                                ) {
++                                    ManualCloudSyncButton()
++                                    Box(Modifier.padding(start = 4.dp)) { createActions() }
++                                }
+                             }
+                         }
+                     }
+                     if (createPinned) {
+-                        Box(Modifier.padding(start = 8.dp, end = 16.dp)) { createActions() }
++                        Row(
++                            modifier = Modifier.padding(start = 8.dp, end = 16.dp),
++                            verticalAlignment = Alignment.CenterVertically,
++                        ) {
++                            ManualCloudSyncButton()
++                            Box(Modifier.padding(start = 4.dp)) { createActions() }
++                        }
+                     }
+                 }
+             }
+@@ -1219,6 +1234,30 @@
+ private const val CHIP_FADE_STEPS = 24
+ 
++@Composable
++private fun ManualCloudSyncButton() {
++    Box(
++        modifier = Modifier.size(44.dp),
++        contentAlignment = Alignment.Center,
++    ) {
++        Box(
++            modifier = Modifier
++                .size(36.dp)
++                .clip(CircleShape)
++                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
++                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
++                .clickable { requestManualCloudSync() },
++            contentAlignment = Alignment.Center,
++        ) {
++            Icon(
++                SimpIcons.Sync,
++                contentDescription = "Sync playback history",
++                tint = MaterialTheme.colorScheme.onBackground,
++            )
++        }
++    }
++}
++
+ /**
+  * The avatar at the start of Home's header. It opens a menu showing who is signed in and the
+  * greeting the old app bar used to show. Signed out, the avatar is a person glyph and the menu
+  * offers the log-in.

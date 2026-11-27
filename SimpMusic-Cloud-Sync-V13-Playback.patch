@@ -1,0 +1,701 @@
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
+--- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt
+@@ -57,12 +57,27 @@
+     fun authenticatedEmail(): String? =
+         if (isConfigured) client.auth.currentUserOrNull()?.email else null
+ 
+-    suspend fun signOut() {
+-        if (isConfigured) client.auth.signOut()
+-    }
+-
+-    private companion object {
+-        const val CALLBACK_SCHEME = "simpmusic"
+-        const val CALLBACK_HOST = "auth-callback"
+-    }
+-}
++    suspend fun cloudCredentials(): CloudCredentials? {
++        if (!isConfigured) return null
++        client.auth.refreshCurrentSession()
++        val session = client.auth.currentSessionOrNull() ?: return null
++        val userId = session.user?.id
++            ?: client.auth.currentUserOrNull()?.id
++            ?: return null
++        return CloudCredentials(userId, session.accessToken)
++    }
++
++    suspend fun signOut() {
++        if (isConfigured) client.auth.signOut()
++    }
++
++    private companion object {
++        const val CALLBACK_SCHEME = "simpmusic"
++        const val CALLBACK_HOST = "auth-callback"
++    }
++}
++
++data class CloudCredentials(
++    val userId: String,
++    val accessToken: String,
++)
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncModule.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncModule.kt
+--- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncModule.kt
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncModule.kt
+@@ -1,7 +1,10 @@
+ package com.maxrave.simpmusic.cloudsync
+ 
+-import org.koin.dsl.module
+-
+-val cloudSyncModule = module {
+-    single { CloudSyncAuth() }
++import com.maxrave.data.db.SyncDao
++import org.koin.android.ext.koin.androidContext
++import org.koin.dsl.module
++
++val cloudSyncModule = module {
++    single { CloudSyncAuth() }
++    single { CloudSyncPlaybackSync(androidContext(), get(), get<SyncDao>()) }
+ }
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncPlaybackSync.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncPlaybackSync.kt
+new file mode 100644
+--- /dev/null
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncPlaybackSync.kt
+@@ -0,0 +1,263 @@
++package com.maxrave.simpmusic.cloudsync
++
++import android.content.Context
++import android.os.Build
++import com.maxrave.data.db.SyncDao
++import com.maxrave.domain.data.entities.analytics.PlaybackEventEntity
++import com.maxrave.simpmusic.BuildConfig
++import com.maxrave.simpmusic.BuildKonfig
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.withContext
++import kotlinx.datetime.TimeZone
++import kotlinx.datetime.toInstant
++import kotlinx.datetime.toLocalDateTime
++import org.json.JSONArray
++import org.json.JSONObject
++import java.io.IOException
++import java.net.HttpURLConnection
++import java.net.URL
++import java.net.URLEncoder
++import java.time.Instant as JavaInstant
++import java.util.UUID
++import kotlin.time.Instant
++
++data class CloudSyncResult(val uploaded: Int, val downloaded: Int)
++
++class CloudSyncPlaybackSync(
++    context: Context,
++    private val auth: CloudSyncAuth,
++    private val dao: SyncDao,
++) {
++    private val preferences =
++        context.applicationContext.getSharedPreferences("simpcloud_device", Context.MODE_PRIVATE)
++
++    suspend fun syncNow(): CloudSyncResult = withContext(Dispatchers.IO) {
++        val credentials = auth.cloudCredentials()
++            ?: throw IllegalStateException("Connect your Google account before syncing.")
++        val deviceKey = deviceKey()
++        val deviceCreatedAt = registerDevice(credentials.userId, credentials.accessToken, deviceKey)
++        val from = Instant.fromEpochMilliseconds(
++            parseServerInstant(deviceCreatedAt).toEpochMilli(),
++        ).toLocalDateTime(TimeZone.UTC)
++
++        // Assign stable IDs only to previously untagged local events from this device's cloud-link date.
++        dao.eventsWithoutSyncId(from).forEach { event ->
++            dao.setEventSyncId(event.eventId, UUID.randomUUID().toString())
++        }
++
++        val localIds = dao.ownEventSyncIdsSince(from).distinct()
++        var uploaded = 0
++        localIds.chunked(BATCH_SIZE).forEach { batch ->
++            val rows = JSONArray()
++            dao.eventsBySyncId(batch).forEach { event ->
++                val syncId = event.syncId ?: return@forEach
++                val artists = JSONArray()
++                dao.eventArtists(event.eventId).distinct().forEach(artists::put)
++                rows.put(
++                    JSONObject()
++                        .put("user_id", credentials.userId)
++                        .put("sync_id", syncId)
++                        .put("device_key", deviceKey)
++                        .put("played_at", event.timestamp.toInstant(TimeZone.UTC).toString())
++                        .put("video_id", event.videoId)
++                        .put("album_browse_id", event.albumBrowseId ?: JSONObject.NULL)
++                        .put("duration_seconds", event.durationSecond)
++                        .put("listened_seconds", event.listenedSecond)
++                        .put("artist_ids", artists),
++                )
++            }
++            if (rows.length() > 0) {
++                request(
++                    "POST",
++                    "cloud_playback_events?on_conflict=user_id,sync_id",
++                    credentials.accessToken,
++                    rows.toString(),
++                    "resolution=ignore-duplicates,return=minimal",
++                )
++                uploaded += rows.length()
++            }
++        }
++
++        val cursor = readOrCreateSyncState(credentials.userId, credentials.accessToken, deviceKey)
++        var newestCursor = cursor
++        var offset = 0
++        var downloaded = 0
++        while (true) {
++            val query =
++                "cloud_playback_events?select=sync_id,device_key,played_at,video_id,album_browse_id,duration_seconds,listened_seconds,artist_ids,created_at" +
++                    "&user_id=eq.${encode(credentials.userId)}" +
++                    (cursor?.let { "&created_at=gte.${encode(it)}" } ?: "") +
++                    "&order=created_at.asc,id.asc&limit=$BATCH_SIZE&offset=$offset"
++            val page = JSONArray(request("GET", query, credentials.accessToken))
++            for (index in 0 until page.length()) {
++                val row = page.getJSONObject(index)
++                newestCursor = newerCursor(newestCursor, row.getString("created_at"))
++                if (row.getString("device_key") == deviceKey) continue
++
++                val playedAt = parseServerInstant(row.getString("played_at")).toEpochMilli()
++                val timestamp = Instant.fromEpochMilliseconds(playedAt).toLocalDateTime(TimeZone.UTC)
++                val artistArray = row.optJSONArray("artist_ids") ?: JSONArray()
++                val artists = buildList {
++                    for (artistIndex in 0 until artistArray.length()) {
++                        artistArray.optString(artistIndex).takeIf { it.isNotBlank() }?.let(::add)
++                    }
++                }
++                dao.insertEventWithArtists(
++                    PlaybackEventEntity(
++                        timestamp = timestamp,
++                        videoId = row.getString("video_id"),
++                        albumBrowseId = row.optString("album_browse_id").takeIf { it.isNotBlank() },
++                        durationSecond = row.optLong("duration_seconds"),
++                        listenedSecond = row.optLong("listened_seconds"),
++                        syncId = row.getString("sync_id"),
++                        deviceId = row.getString("device_key"),
++                    ),
++                    artists,
++                )
++                downloaded++
++            }
++            if (page.length() < BATCH_SIZE) break
++            offset += page.length()
++        }
++
++        val now = JavaInstant.now().toString()
++        val state = JSONObject()
++            .put("last_upload_at", now)
++            .put("last_download_at", now)
++            .put("server_cursor", newestCursor ?: JSONObject.NULL)
++            .put("updated_at", now)
++        request(
++            "PATCH",
++            "cloud_sync_state?user_id=eq.${encode(credentials.userId)}&device_key=eq.${encode(deviceKey)}",
++            credentials.accessToken,
++            state.toString(),
++            "return=minimal",
++        )
++        CloudSyncResult(uploaded, downloaded)
++    }
++
++    private fun registerDevice(userId: String, token: String, deviceKey: String): String {
++        val filter =
++            "cloud_devices?select=created_at,revoked_at&user_id=eq.${encode(userId)}&device_key=eq.${encode(deviceKey)}&limit=1"
++        val existing = JSONArray(request("GET", filter, token))
++        if (existing.length() > 0) {
++            val row = existing.getJSONObject(0)
++            if (!row.isNull("revoked_at")) {
++                throw IllegalStateException("This device has been revoked from SimpCloud.")
++            }
++            request(
++                "PATCH",
++                "cloud_devices?user_id=eq.${encode(userId)}&device_key=eq.${encode(deviceKey)}",
++                token,
++                JSONObject().put("last_seen_at", JavaInstant.now().toString()).toString(),
++                "return=minimal",
++            )
++            return row.getString("created_at")
++        }
++
++        val body = JSONArray().put(
++            JSONObject()
++                .put("user_id", userId)
++                .put("device_key", deviceKey)
++                .put("device_name", Build.MODEL.orEmpty().ifBlank { "Android device" })
++                .put("platform", "android")
++                .put("app_version", BuildConfig.VERSION_NAME)
++                .put("last_seen_at", JavaInstant.now().toString()),
++        )
++        val inserted = JSONArray(
++            request(
++                "POST",
++                "cloud_devices?on_conflict=user_id,device_key",
++                token,
++                body.toString(),
++                "resolution=ignore-duplicates,return=representation",
++            ),
++        )
++        if (inserted.length() > 0) return inserted.getJSONObject(0).getString("created_at")
++        val raced = JSONArray(request("GET", filter, token))
++        if (raced.length() == 0 || !raced.getJSONObject(0).isNull("revoked_at")) {
++            throw IOException("Could not register this SimpCloud device.")
++        }
++        return raced.getJSONObject(0).getString("created_at")
++    }
++
++    private fun readOrCreateSyncState(userId: String, token: String, deviceKey: String): String? {
++        val filter =
++            "cloud_sync_state?select=server_cursor&user_id=eq.${encode(userId)}&device_key=eq.${encode(deviceKey)}&limit=1"
++        val rows = JSONArray(request("GET", filter, token))
++        if (rows.length() > 0) {
++            val row = rows.getJSONObject(0)
++            return if (row.isNull("server_cursor")) null else row.optString("server_cursor").takeIf { it.isNotBlank() }
++        }
++        val body = JSONArray().put(JSONObject().put("user_id", userId).put("device_key", deviceKey))
++        request(
++            "POST",
++            "cloud_sync_state?on_conflict=user_id,device_key",
++            token,
++            body.toString(),
++            "resolution=ignore-duplicates,return=minimal",
++        )
++        val retry = JSONArray(request("GET", filter, token))
++        if (retry.length() == 0) throw IOException("Could not initialize the SimpCloud sync cursor.")
++        val row = retry.getJSONObject(0)
++        return if (row.isNull("server_cursor")) null else row.optString("server_cursor").takeIf { it.isNotBlank() }
++    }
++
++    private fun deviceKey(): String =
++        preferences.getString(KEY_DEVICE, null) ?: UUID.randomUUID().toString().also {
++            preferences.edit().putString(KEY_DEVICE, it).apply()
++        }
++
++    private fun request(
++        method: String,
++        path: String,
++        token: String,
++        body: String? = null,
++        prefer: String? = null,
++    ): String {
++        val connection = URL("${BuildKonfig.supabaseUrl.trimEnd('/')}/rest/v1/$path")
++            .openConnection() as HttpURLConnection
++        try {
++            connection.requestMethod = method
++            connection.connectTimeout = TIMEOUT_MS
++            connection.readTimeout = TIMEOUT_MS
++            connection.setRequestProperty("apikey", BuildKonfig.supabasePublishableKey)
++            connection.setRequestProperty("Authorization", "Bearer $token")
++            connection.setRequestProperty("Accept", "application/json")
++            connection.setRequestProperty("Content-Type", "application/json")
++            prefer?.let { connection.setRequestProperty("Prefer", it) }
++            if (body != null) {
++                connection.doOutput = true
++                connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
++            }
++            val status = connection.responseCode
++            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
++            val response = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
++            if (status !in 200..299) {
++                val message = runCatching { JSONObject(response).optString("message") }.getOrNull()
++                throw IOException(
++                    "Cloud sync request failed ($status): " +
++                        (message?.takeIf { it.isNotBlank() } ?: response.take(180)),
++                )
++            }
++            return response
++        } finally {
++            connection.disconnect()
++        }
++    }
++
++    private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
++
++    private fun parseServerInstant(value: String): JavaInstant =
++        JavaInstant.parse(if (value.endsWith("+00:00")) value.dropLast(6) + "Z" else value)
++
++    private fun newerCursor(current: String?, candidate: String): String =
++        if (current == null || parseServerInstant(candidate).isAfter(parseServerInstant(current))) candidate
++        else current
++
++    private companion object {
++        const val KEY_DEVICE = "device_key"
++        const val BATCH_SIZE = 200
++        const val TIMEOUT_MS = 20_000
++    }
++}
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
+--- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncActivity.kt
+@@ -35,175 +35,202 @@
+ 
+ class CloudSyncActivity : AppCompatActivity() {
+     private val cloudSyncAuth: CloudSyncAuth by inject()
+-    private val emailState = mutableStateOf<String?>(null)
+-
+-    override fun onCreate(savedInstanceState: Bundle?) {
+-        super.onCreate(savedInstanceState)
+-        handleAuthIntent(intent)
+-        emailState.value = cloudSyncAuth.authenticatedEmail()
+-        setContent {
+-            MaterialTheme {
+-                CloudSyncPage(
+-                    isConfigured = cloudSyncAuth.isConfigured,
+-                    emailState = emailState,
+-                    onBack = { finish() },
+-                    onSignIn = {
+-                        cloudSyncAuth.signInWithGoogle()
+-                    },
+-                    onSignOut = {
+-                        cloudSyncAuth.signOut()
+-                        emailState.value = cloudSyncAuth.authenticatedEmail()
+-                    },
+-                )
+-            }
+-        }
+-    }
+-
+-    override fun onNewIntent(intent: Intent) {
+-        super.onNewIntent(intent)
+-        setIntent(intent)
+-        handleAuthIntent(intent)
+-        emailState.value = cloudSyncAuth.authenticatedEmail()
+-    }
+-
+-    override fun onResume() {
+-        super.onResume()
+-        emailState.value = cloudSyncAuth.authenticatedEmail()
+-    }
+-
+-    private fun handleAuthIntent(intent: Intent?) {
+-        if (intent?.data?.let {
+-                it.scheme == "simpmusic" && it.host == "auth-callback"
+-            } == true
+-        ) {
+-            cloudSyncAuth.handleCallback(intent)
+-        }
+-    }
+-}
+-
+-@Composable
+-private fun CloudSyncPage(
+-    isConfigured: Boolean,
+-    emailState: androidx.compose.runtime.MutableState<String?>,
+-    onBack: () -> Unit,
+-    onSignIn: suspend () -> Unit,
+-    onSignOut: suspend () -> Unit,
+-) {
+-    val scope = rememberCoroutineScope()
+-    var busy by androidx.compose.runtime.remember { mutableStateOf(false) }
+-    var error by androidx.compose.runtime.remember { mutableStateOf<String?>(null) }
+-
+-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+-        Column(
+-            modifier = Modifier.fillMaxSize().padding(24.dp),
+-            verticalArrangement = Arrangement.spacedBy(18.dp),
+-        ) {
+-            Row(verticalAlignment = Alignment.CenterVertically) {
+-                OutlinedButton(onClick = onBack) { Text("Back") }
+-                Spacer(Modifier.width(12.dp))
+-                Text("SimpCloud Sync", style = MaterialTheme.typography.headlineSmall)
+-            }
+-
+-            Text(
+-                "Use your Google account to connect SimpMusic to your private cloud space.",
+-                style = MaterialTheme.typography.bodyLarge,
+-            )
+-
+-            Card(
+-                modifier = Modifier.fillMaxWidth(),
+-                shape = RoundedCornerShape(20.dp),
+-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+-            ) {
+-                Column(
+-                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+-                ) {
+-                    Text(
+-                        if (emailState.value.isNullOrBlank()) "Not connected" else "Google account connected",
+-                        style = MaterialTheme.typography.titleMedium,
+-                    )
+-                    if (!emailState.value.isNullOrBlank()) {
+-                        Text(emailState.value.orEmpty(), style = MaterialTheme.typography.bodyMedium)
+-                    } else {
+-                        Text(
+-                            "Sign in to establish your SimpCloud identity.",
+-                            style = MaterialTheme.typography.bodyMedium,
+-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+-                        )
+-                    }
+-
+-                    if (!isConfigured) {
+-                        Text(
+-                            "Cloud Sync is not configured. Check the Supabase build configuration.",
+-                            color = MaterialTheme.colorScheme.error,
+-                        )
+-                    } else if (emailState.value.isNullOrBlank()) {
+-                        Button(
+-                            onClick = {
+-                                error = null
+-                                scope.launch {
+-                                    busy = true
+-                                    try {
+-                                        onSignIn()
+-                                    } catch (t: Throwable) {
+-                                        error = t.message ?: "Google sign-in could not be started."
+-                                    } finally {
+-                                        busy = false
+-                                    }
+-                                }
+-                            },
+-                            enabled = !busy,
+-                            modifier = Modifier.fillMaxWidth(),
+-                        ) {
+-                            if (busy) {
+-                                CircularProgressIndicator()
+-                            } else {
+-                                Text("Continue with Google")
+-                            }
+-                        }
+-                    } else {
+-                        OutlinedButton(
+-                            onClick = {
+-                                error = null
+-                                scope.launch {
+-                                    busy = true
+-                                    try {
+-                                        onSignOut()
+-                                    } catch (t: Throwable) {
+-                                        error = t.message ?: "Could not sign out."
+-                                    } finally {
+-                                        emailState.value = null
+-                                        busy = false
+-                                    }
+-                                }
+-                            },
+-                            enabled = !busy,
+-                            modifier = Modifier.fillMaxWidth(),
+-                        ) {
+-                            Text("Sign out")
+-                        }
+-                    }
+-                    if (error != null) {
+-                        Text(error.orEmpty(), color = MaterialTheme.colorScheme.error)
+-                    }
+-                    if (busy) {
+-                        Spacer(Modifier.height(2.dp))
+-                        CircularProgressIndicator()
+-                    }
+-                }
+-            }
+-
+-            Card(
+-                modifier = Modifier.fillMaxWidth(),
+-                shape = RoundedCornerShape(20.dp),
+-            ) {
+-                Column(
+-                    modifier = Modifier.padding(20.dp),
+-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+-                ) {
+-                    Text("What happens next", style = MaterialTheme.typography.titleMedium)
+-                    Text(
+-                        "Your SimpCloud identity is based only on the Google account connected here. Your YouTube Music sign-in is independent. Listening history, Insights, audio effects and app settings will be synchronized in a later stage.",
++    private val cloudSyncPlaybackSync: CloudSyncPlaybackSync by inject()
++    private val emailState = mutableStateOf<String?>(null)
++
++    override fun onCreate(savedInstanceState: Bundle?) {
++        super.onCreate(savedInstanceState)
++        handleAuthIntent(intent)
++        emailState.value = cloudSyncAuth.authenticatedEmail()
++        setContent {
++            MaterialTheme {
++                CloudSyncPage(
++                    isConfigured = cloudSyncAuth.isConfigured,
++                    emailState = emailState,
++                    onBack = { finish() },
++                    onSignIn = {
++                        cloudSyncAuth.signInWithGoogle()
++                    },
++                    onSignOut = {
++                        cloudSyncAuth.signOut()
++                        emailState.value = cloudSyncAuth.authenticatedEmail()
++                    },
++                    onSync = { cloudSyncPlaybackSync.syncNow() },
++                )
++            }
++        }
++    }
++
++    override fun onNewIntent(intent: Intent) {
++        super.onNewIntent(intent)
++        setIntent(intent)
++        handleAuthIntent(intent)
++        emailState.value = cloudSyncAuth.authenticatedEmail()
++    }
++
++    override fun onResume() {
++        super.onResume()
++        emailState.value = cloudSyncAuth.authenticatedEmail()
++    }
++
++    private fun handleAuthIntent(intent: Intent?) {
++        if (intent?.data?.let {
++                it.scheme == "simpmusic" && it.host == "auth-callback"
++            } == true
++        ) {
++            cloudSyncAuth.handleCallback(intent)
++        }
++    }
++}
++
++@Composable
++private fun CloudSyncPage(
++    isConfigured: Boolean,
++    emailState: androidx.compose.runtime.MutableState<String?>,
++    onBack: () -> Unit,
++    onSignIn: suspend () -> Unit,
++    onSignOut: suspend () -> Unit,
++    onSync: suspend () -> CloudSyncResult,
++) {
++    val scope = rememberCoroutineScope()
++    var busy by androidx.compose.runtime.remember { mutableStateOf(false) }
++    var error by androidx.compose.runtime.remember { mutableStateOf<String?>(null) }
++    var syncStatus by androidx.compose.runtime.remember {
++        mutableStateOf("Listening history has not been synced yet.")
++    }
++
++    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
++        Column(
++            modifier = Modifier.fillMaxSize().padding(24.dp),
++            verticalArrangement = Arrangement.spacedBy(18.dp),
++        ) {
++            Row(verticalAlignment = Alignment.CenterVertically) {
++                OutlinedButton(onClick = onBack) { Text("Back") }
++                Spacer(Modifier.width(12.dp))
++                Text("SimpCloud Sync", style = MaterialTheme.typography.headlineSmall)
++            }
++
++            Text(
++                "Use your Google account to connect SimpMusic to your private cloud space.",
++                style = MaterialTheme.typography.bodyLarge,
++            )
++
++            Card(
++                modifier = Modifier.fillMaxWidth(),
++                shape = RoundedCornerShape(20.dp),
++                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
++            ) {
++                Column(
++                    modifier = Modifier.fillMaxWidth().padding(20.dp),
++                    verticalArrangement = Arrangement.spacedBy(10.dp),
++                ) {
++                    Text(
++                        if (emailState.value.isNullOrBlank()) "Not connected" else "Google account connected",
++                        style = MaterialTheme.typography.titleMedium,
++                    )
++                    if (!emailState.value.isNullOrBlank()) {
++                        Text(emailState.value.orEmpty(), style = MaterialTheme.typography.bodyMedium)
++                    } else {
++                        Text(
++                            "Sign in to establish your SimpCloud identity.",
++                            style = MaterialTheme.typography.bodyMedium,
++                            color = MaterialTheme.colorScheme.onSurfaceVariant,
++                        )
++                    }
++
++                    if (!isConfigured) {
++                        Text(
++                            "Cloud Sync is not configured. Check the Supabase build configuration.",
++                            color = MaterialTheme.colorScheme.error,
++                        )
++                    } else if (emailState.value.isNullOrBlank()) {
++                        Button(
++                            onClick = {
++                                error = null
++                                scope.launch {
++                                    busy = true
++                                    try {
++                                        onSignIn()
++                                    } catch (t: Throwable) {
++                                        error = t.message ?: "Google sign-in could not be started."
++                                    } finally {
++                                        busy = false
++                                    }
++                                }
++                            },
++                            enabled = !busy,
++                            modifier = Modifier.fillMaxWidth(),
++                        ) {
++                            if (busy) {
++                                CircularProgressIndicator()
++                            } else {
++                                Text("Continue with Google")
++                            }
++                        }
++                    } else {
++                        Button(
++                            onClick = {
++                                error = null
++                                scope.launch {
++                                    busy = true
++                                    try {
++                                        val result = onSync()
++                                        syncStatus = "Sync complete. Uploaded ${result.uploaded} plays and downloaded ${result.downloaded} plays."
++                                    } catch (t: Throwable) {
++                                        error = t.message ?: "Cloud sync failed."
++                                    } finally {
++                                        busy = false
++                                    }
++                                }
++                            },
++                            enabled = !busy,
++                            modifier = Modifier.fillMaxWidth(),
++                        ) {
++                            Text("Sync listening history")
++                        }
++                        Text(syncStatus, style = MaterialTheme.typography.bodySmall)
++                        OutlinedButton(
++                            onClick = {
++                                error = null
++                                scope.launch {
++                                    busy = true
++                                    try {
++                                        onSignOut()
++                                    } catch (t: Throwable) {
++                                        error = t.message ?: "Could not sign out."
++                                    } finally {
++                                        emailState.value = null
++                                        busy = false
++                                    }
++                                }
++                            },
++                            enabled = !busy,
++                            modifier = Modifier.fillMaxWidth(),
++                        ) {
++                            Text("Sign out")
++                        }
++                    }
++                    if (error != null) {
++                        Text(error.orEmpty(), color = MaterialTheme.colorScheme.error)
++                    }
++                    if (busy) {
++                        Spacer(Modifier.height(2.dp))
++                        CircularProgressIndicator()
++                    }
++                }
++            }
++
++            Card(
++                modifier = Modifier.fillMaxWidth(),
++                shape = RoundedCornerShape(20.dp),
++            ) {
++                Column(
++                    modifier = Modifier.padding(20.dp),
++                    verticalArrangement = Arrangement.spacedBy(8.dp),
++                ) {
++                    Text("What happens next", style = MaterialTheme.typography.titleMedium)
++                    Text(
++                        "Your SimpCloud identity is based only on the Google account connected here. Your YouTube Music sign-in is independent. This stage synchronizes new listening history between devices. Insights, audio effects and app settings will follow in later stages.",
+                         style = MaterialTheme.typography.bodyMedium,
+                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                     )

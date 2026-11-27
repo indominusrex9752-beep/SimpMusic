@@ -1,0 +1,16 @@
+diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncSettingsSync.kt b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncSettingsSync.kt
+--- a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncSettingsSync.kt
++++ b/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncSettingsSync.kt
+@@ -1,5 +1,5 @@
+             "appearance" to setOf(
+-                "theme_mode", "theme_color_source", "custom_theme_color", "now_playing_style", "liquid_glass",
++                "theme_mode", "theme_color_source", "custom_theme_color", "now_playing_style", "liquid_glass", "title_marquee",
+             ),
+             "general" to setOf(
+@@ -1,5 +1,5 @@
+             "lyrics" to setOf(
+                 "lyrics_provider", "translation_language", "use_translation_language", "use_ai_translation",
+                 "spotify_lyrics", "lyrics_style", "romanization_languages", "youtube_subtitle_language",
+-                "preferred_audio_language",
++                "preferred_audio_language", "animated_lyrics_background", "lyrics_background_pulse", "ai_provider", "custom_model_id",
+             ),
