@@ -29,6 +29,13 @@ FEATURE_PATHS = [
     "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/LibraryViewModel.kt",
     "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/LibraryDynamicPlaylistViewModel.kt",
     "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/LocalPlaylistViewModel.kt",
+    "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SongSelectionViewModel.kt",
+    "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/ValueSlider.kt",
+    "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/LiquidGlassContainer.kt",
+    "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/expect/ui/LiquidGlass.kt",
+    "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/expect/ui/DisplayCorner.kt",
+    "composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/ui/DisplayCorner.android.kt",
+    "composeApp/src/jvmMain/kotlin/com/maxrave/simpmusic/expect/ui/DisplayCorner.jvm.kt",
     "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/EqualizerSection.kt",
     "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/ModalBottomSheet.kt",
     "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/FullscreenLyricsContent.kt",
@@ -89,6 +96,30 @@ if not diff:
     raise SystemExit("No selected 2.7 feature changes were found between the custom and upgrade branches.")
 run(["git", "apply", "--check"], input=diff)
 run(["git", "apply"], input=diff)
+
+# These screens and their support APIs must move together. Copy them explicitly so missing
+# diff entries cannot leave the custom base with an older component contract.
+for support_path in (
+    "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/ValueSlider.kt",
+    "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/LiquidGlassContainer.kt",
+    "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/expect/ui/LiquidGlass.kt",
+    "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/expect/ui/DisplayCorner.kt",
+    "composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/ui/DisplayCorner.android.kt",
+    "composeApp/src/jvmMain/kotlin/com/maxrave/simpmusic/expect/ui/DisplayCorner.jvm.kt",
+    "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SongSelectionViewModel.kt",
+):
+    content = run(["git", "show", f"{UPGRADE}:{support_path}"], text=True, stdout=subprocess.PIPE).stdout
+    target = ROOT / support_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(content)
+
+# The carousel API in the selected dependency set renamed this argument.
+home_styles = ROOT / "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/HomeSectionStyles.kt"
+if home_styles.is_file():
+    source = home_styles.read_text()
+    source = source.replace("maxItemWidth = heroWidth,", "preferredItemWidth = heroWidth,")
+    home_styles.write_text(source)
+
 print("Applied the selected 2.7 app, library, lyrics, theme, equalizer and desktop changes.")
 
 # Add only resources used by the selected features. Search Settings, app icons and AI-provider
