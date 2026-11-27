@@ -23,7 +23,7 @@ if source.count(event_anchor) != 1 or source.count(official_comment) != 1:
 
 fallback = """                // V17 full-playlist fallback: load every continuation page before shuffling.
                 // Keep the official 2.7 endpoint path below unchanged whenever an endpoint exists.
-                if (data.shuffleEndpoint == null && !continuation.value.isNullOrEmpty()) {
+                if (data.shuffleEndpoint == null) {
                     viewModelScope.launch {
                         try {
                             val allTracks = tracks.value.toMutableList()
