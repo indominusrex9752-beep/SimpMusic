@@ -3210,6 +3210,9 @@ fun SettingScreen(
                 val googleAccounts by viewModel.googleAccounts.collectAsStateWithLifecycle(
                     minActiveState = Lifecycle.State.RESUMED,
                 )
+                val selectedYouTubeGoogleEmail by viewModel.selectedYouTubeGoogleEmail.collectAsStateWithLifecycle(
+                    minActiveState = Lifecycle.State.RESUMED,
+                )
                 LaunchedEffect(googleAccounts) {
                     Logger.w(
                         "SettingScreen",
@@ -3298,7 +3301,7 @@ fun SettingScreen(
                                         Text(it.name, style = typo().labelMedium, color = MaterialTheme.colorScheme.onBackground)
                                         Text(it.email, style = typo().bodySmall)
                                         if (it.isUsed) {
-                                            val selectedGoogleEmail = it.googleEmail?.trim()?.takeIf { email -> email.isNotBlank() }
+                                            val selectedGoogleEmail = selectedYouTubeGoogleEmail?.trim()?.takeIf { email -> email.isNotBlank() }
                                             Text(
                                                 text = selectedGoogleEmail?.let { email ->
                                                     "SimpCloud Google identity: $email"
