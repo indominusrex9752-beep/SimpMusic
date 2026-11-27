@@ -196,7 +196,10 @@ jobs:
 
           account_settings = root / "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt"
           account_ui = account_settings.read_text()
-          if "it.googleEmail" not in account_ui or "SimpCloud matching unavailable" not in account_ui:
+          settings_view_model = root / "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SettingsViewModel.kt"
+          if "selectedYouTubeGoogleEmail" not in settings_view_model.read_text():
+              raise SystemExit("The selected YouTube Google identity lookup is missing.")
+          if "selectedYouTubeGoogleEmail" not in account_ui or "SimpCloud matching unavailable" not in account_ui:
               raise SystemExit("The selected YouTube account matching diagnostic is missing.")
 
           resources = root / "composeApp/src/commonMain/composeResources/values/strings.xml"
