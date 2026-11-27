@@ -275,6 +275,56 @@ def patch_settings_view_model(source: str) -> str:
         source = replace_once(source, "class SettingsViewModel(\n", constants + "class SettingsViewModel(\n", "selected preference keys")
 
     state_anchor = "    private var _enableLiquidGlass: MutableStateFlow<Boolean> = MutableStateFlow(false)\n    val enableLiquidGlass: StateFlow<Boolean> = _enableLiquidGlass\n"
+
+    # Keep the selected YouTube identity lookup, but do not import the full 2.7 SettingsViewModel.
+    account_anchor = "    val googleAccounts: StateFlow<LocalResource<List<GoogleAccountEntity>>> = _googleAccounts\\n"
+    account_addition = """    private val _selectedYouTubeGoogleEmail = MutableStateFlow<String?>(null)
+    val selectedYouTubeGoogleEmail: StateFlow<String?> = _selectedYouTubeGoogleEmail
+    private var selectedYouTubeIdentityJob: Job? = null
+
+    private fun refreshSelectedYouTubeGoogleEmail() {
+        selectedYouTubeIdentityJob?.cancel()
+        selectedYouTubeIdentityJob = viewModelScope.launch {
+            _selectedYouTubeGoogleEmail.value = null
+            val email = try {
+                val cookie = dataStoreManager.cookie.first()
+                val pageId = dataStoreManager.pageId.first()
+                val authUser = dataStoreManager.authUser.first()
+                if (cookie.isBlank() || pageId.isBlank()) {
+                    null
+                } else {
+                    accountRepository
+                        .getAccountInfo(cookie)
+                        .firstOrNull()
+                        ?.firstOrNull { it.pageId == pageId && it.authUser == authUser }
+                        ?.googleEmail
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Logger.w("SettingsViewModel", "Could not refresh selected YouTube Google identity: ${e.message}")
+                null
+            }
+            _selectedYouTubeGoogleEmail.value = email?.trim()?.takeIf { it.contains("@") }
+        }
+    }
+
+"""
+    if "_selectedYouTubeGoogleEmail" not in source:
+        source = replace_once(source, account_anchor, account_anchor + account_addition, "selected YouTube Google identity lookup")
+
+    account_success = """                if (!accounts.isNullOrEmpty()) {
+                    _googleAccounts.emit(LocalResource.Success(accounts))
+                } else {
+"""
+    account_success_new = """                if (!accounts.isNullOrEmpty()) {
+                    _googleAccounts.emit(LocalResource.Success(accounts))
+                    refreshSelectedYouTubeGoogleEmail()
+                } else {
+                    _selectedYouTubeGoogleEmail.value = null
+"""
+    if "refreshSelectedYouTubeGoogleEmail()" not in source:
+        source = replace_once(source, account_success, account_success_new, "refresh selected YouTube identity with account list")
     state_addition = (
         "    private val _titleMarquee = MutableStateFlow(true)\n"
         "    val titleMarquee: StateFlow<Boolean> = _titleMarquee\n"
