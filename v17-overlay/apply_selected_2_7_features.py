@@ -471,6 +471,28 @@ def patch_shared_view_model(source: str) -> str:
             delete_methods + "    fun loadSharedMediaItem(videoId: String) {",
             "Delete Lyrics action",
         )
+
+    # The Insights archive restores the pre-2.7 Spotify lyrics call. The upgraded core
+    # requires title and artists so it can rank Spotify lyric matches against the track.
+    legacy_spotify_call = "lyricsCanvasRepository.getSpotifyLyrics(dataStoreManager, query, duration)"
+    upgraded_spotify_call = (
+        "lyricsCanvasRepository.getSpotifyLyrics(\\n"
+        "                    dataStoreManager,\\n"
+        "                    query,\\n"
+        "                    duration,\\n"
+        "                    track.title,\\n"
+        "                    track.artists?.map { it.name }.orEmpty(),\\n"
+        "                )"
+    )
+    if legacy_spotify_call in source:
+        source = replace_once(
+            source,
+            legacy_spotify_call,
+            upgraded_spotify_call,
+            "2.7 Spotify lyrics title and artist arguments",
+        )
+    elif upgraded_spotify_call not in source:
+        raise SystemExit("Spotify lyrics API mismatch: neither legacy nor upgraded call was found.")
     return source
 edit(SHARED_VM, patch_shared_view_model)
 
