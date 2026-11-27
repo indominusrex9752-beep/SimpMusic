@@ -397,6 +397,27 @@ def handler(source, platform):
 
     private suspend fun persistCompletedListeningSession(session: CompletedListeningSession) {
         listeningPersistenceMutex.withLock {
+            // First persist the final snapshot. If Android kills the process during the database
+            // write, the next launch can still recover the complete session rather than an older
+            // two-second checkpoint.
+            val finalCheckpoint = ListeningSessionCheckpoint(
+                syncId = session.syncId,
+                videoId = session.song.videoId,
+                channelIds = session.song.artistId.orEmpty().distinct(),
+                albumBrowseId = session.song.albumId,
+                durationSecond = session.song.durationSeconds.toLong(),
+                listenedMillis = session.listenedMillis,
+                startedAt = session.startedAt,
+            )
+            val raw = dataStoreManager.getString(LISTENING_CHECKPOINT_KEY).first()
+            val checkpoints = raw?.takeIf { it.isNotBlank() }?.let {
+                runCatching { json.decodeFromString<List<ListeningSessionCheckpoint>>(it) }.getOrNull()
+            }.orEmpty()
+            val previous = checkpoints.firstOrNull { it.syncId == session.syncId }
+            val durableCheckpoint = if (previous != null && previous.listenedMillis > finalCheckpoint.listenedMillis) previous else finalCheckpoint
+            val updated = checkpoints.filterNot { it.syncId == session.syncId } + durableCheckpoint
+            dataStoreManager.putString(LISTENING_CHECKPOINT_KEY, json.encodeToString(updated))
+
             val listenedSeconds = (session.listenedMillis / 1000L).coerceAtLeast(0L)
             if (listenedSeconds > 0L) {
                 analyticsRepository.insertPlaybackEvent(
