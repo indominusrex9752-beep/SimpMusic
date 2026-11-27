@@ -236,6 +236,8 @@ jobs:
               for marker in ("listeningRecoveryReady.await()", "persistListeningCheckpoint", "recoverListeningCheckpoint", "persistCompletedListeningSession"):
                   if marker not in handler:
                       raise SystemExit(f"Crash-safe checkpoint marker {marker} is missing from {handler_path}.")
+              if "mayBeTrackingListeningLocal" in handler:
+                  raise SystemExit(f"The legacy percentage-based tracker still overlaps the 30-second Insights accumulator in {handler_path}.")
 
           screen = (root / required[7]).read_text()
           if "CUSTOM_RANGE" not in screen or "DateRangePicker" not in screen:
