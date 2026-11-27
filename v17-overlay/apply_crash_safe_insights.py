@@ -347,11 +347,11 @@ def handler(source, platform):
     # The upstream 2.7 percentage-based tracker must not run beside the fixed 30-second
     # accumulator: it would create duplicate events and count short plays prematurely.
     legacy_call = re.compile(
-        r"        val lastPlayed = nowPlayingState\\.value\\.songEntity\\n"
-        r"        val currentState = simpleMediaState\\.value\\n"
-        r"        if \\(currentState is SimpleMediaState\\.Progress && lastPlayed != null && lastPlayed\\.durationSeconds > 0\\) \\{\\n"
-        r"            mayBeTrackingListeningLocal\\(lastPlayed, currentState\\.progress\\)\\n"
-        r"        \\}\\n"
+        r"        val lastPlayed = nowPlayingState\.value\.songEntity\n"
+        r"        val currentState = simpleMediaState\.value\n"
+        r"        if \(currentState is SimpleMediaState\.Progress && lastPlayed != null && lastPlayed\.durationSeconds > 0\) \{\n"
+        r"            mayBeTrackingListeningLocal\(lastPlayed, currentState\.progress\)\n"
+        r"        \}\n"
     )
     legacy_calls = list(legacy_call.finditer(source))
     if len(legacy_calls) > 1:
@@ -459,7 +459,7 @@ def handler(source, platform):
     # A merged 2.7 handler can still contain the now-unused legacy helper if it landed
     # before saveListeningSession. Remove it as well, so no percentage-based writer remains.
     legacy_method = re.compile(
-        r"    private fun mayBeTrackingListeningLocal\\(\\n.*?^    \\}\\n",
+        r"    private fun mayBeTrackingListeningLocal\(\n.*?^    \}\n",
         re.MULTILINE | re.DOTALL,
     )
     legacy_methods = list(legacy_method.finditer(source))
