@@ -96,7 +96,7 @@ jobs:
                       for entry in insights_resource_entries:
                           if resource_text.count(entry) != 1:
                               raise SystemExit(f"Expected exactly one Insights resource entry: {entry}")
-                          resource_text = resource_text.replace(entry + "\\n", "", 1)
+                          resource_text = resource_text.replace(entry + "\n", "", 1)
                       overlay_data = resource_text.encode("utf-8")
 
                   overlay_file = temp / f"overlay-{index}"
@@ -147,7 +147,7 @@ jobs:
                   if f'name="{resource_name}"' not in resource_text:
                       if resource_text.count("</resources>") != 1:
                           raise SystemExit("Could not safely place the Insights resource strings.")
-                      resource_text = resource_text.replace("</resources>", entry + "\\n</resources>", 1)
+                      resource_text = resource_text.replace("</resources>", entry + "\n</resources>", 1)
               merged[strings_target] = resource_text.encode("utf-8")
 
           for target, data in merged.items():
