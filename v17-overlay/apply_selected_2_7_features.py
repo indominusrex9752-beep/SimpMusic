@@ -45,6 +45,7 @@ FEATURE_PATHS = [
     "composeApp/src/jvmMain/kotlin/com/maxrave/simpmusic/ui/component/MacAppearance.kt",
     "composeApp/src/jvmMain/kotlin/com/maxrave/simpmusic/ui/mini_player/MiniPlayerLayout.kt",
     "composeApp/src/jvmMain/kotlin/com/maxrave/simpmusic/ui/mini_player/MiniPlayerWindow.kt",
+    "desktopApp/build.gradle.kts",
 ]
 
 def run(args, **kwargs):
