@@ -221,12 +221,37 @@ jobs:
           settings_view_model = root / "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SettingsViewModel.kt"
           if "selectedYouTubeGoogleEmail" not in settings_view_model.read_text():
               raise SystemExit("The selected YouTube Google identity lookup is missing.")
-          if "selectedYouTubeGoogleEmail" not in account_ui or "SimpCloud matching unavailable" not in account_ui:
-              raise SystemExit("The selected YouTube account matching diagnostic is missing.")
+          if "selectedYouTubeGoogleEmail" not in account_ui or "SimpCloud matching unavailable" not in account_ui or "YouTube Google email:" not in account_ui:
+              raise SystemExit("The selected YouTube account matching diagnostic is missing or mislabeled.")
 
           resources = root / "composeApp/src/commonMain/composeResources/values/strings.xml"
           ET.parse(resources)
           print("Insights merge checks passed: files, 30-second threshold, stall guard, date filters, navigation and XML.")
+          PY
+
+      - name: Check merged source formatting and conflict markers
+        run: |
+          git diff --check
+          git -C core diff --check
+          python3 - <<'PY'
+          import pathlib
+          roots = [pathlib.Path("."), pathlib.Path("core")]
+          markers = ("<<<<<<< ", "=======", ">>>>>>> ")
+          bad = []
+          for root in roots:
+              for path in root.rglob("*"):
+                  if not path.is_file() or ".git" in path.parts or path.suffix not in {".kt", ".kts", ".xml"}:
+                      continue
+                  try:
+                      lines = path.read_text().splitlines()
+                  except UnicodeDecodeError:
+                      continue
+                  for number, line in enumerate(lines, 1):
+                      if line.startswith(markers):
+                          bad.append(f"{path}:{number}")
+          if bad:
+              raise SystemExit("Unresolved merge markers: " + ", ".join(bad[:30]))
+          print("Whitespace and merge-marker checks passed.")
           PY
 
       - name: Configure build and Supabase
