@@ -239,6 +239,8 @@ jobs:
           datasource = (root / "core/data/src/commonMain/kotlin/com/maxrave/data/db/datasource/AnalyticsDatasource.kt").read_text()
           if "stableSyncId" not in datasource or "syncRecorder.play(stableSyncId)" not in datasource:
               raise SystemExit("Checkpoint recovery is not connected to the existing history-sync event.")
+          if "PlaybackSyncSignal.notifyNewPlayback()" not in datasource:
+              raise SystemExit("Checkpoint recovery bypasses the existing immediate playback-sync signal.")
           sync_applier = (root / "core/data/src/commonMain/kotlin/com/maxrave/data/librarysync/SyncApplier.kt").read_text()
           if "getPlaybackEventBySyncId(event.syncId)" not in sync_applier or "existing.copy(listenedSecond = event.listenedSecond)" not in sync_applier:
               raise SystemExit("A retried history event cannot update its existing synced play.")
