@@ -373,6 +373,36 @@ jobs:
           python3 -m py_compile v17-overlay/apply_shuffle_fix.py
           python3 v17-overlay/apply_shuffle_fix.py
 
+      - name: Validate full-playlist shuffle and Google identity extraction
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          playlist = Path("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/PlaylistViewModel.kt").read_text()
+          for marker in (
+              "V17 full-playlist fallback: load every continuation page",
+              "while (!nextContinuation.isNullOrEmpty())",
+              "visitedContinuations.add(nextContinuation)",
+              "getContinueTrack(",
+              "val shuffledTracks = allTracks.shuffled()",
+              "playlistType = PlaylistType.PLAYLIST",
+          ):
+              if marker not in playlist:
+                  raise SystemExit(f"Full-playlist shuffle fallback is incomplete: {marker}")
+
+          # The official 2.7 endpoint branch must remain present alongside the fallback.
+          if "songRepository.getRadioFromEndpoint(shuffleEndpoint)" not in playlist:
+              raise SystemExit("Official 2.7 shuffle endpoint path was replaced.")
+
+          switcher = Path("core/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotlinytmusicscraper/models/response/AccountSwitcherEndpointResponse.kt").read_text()
+          mapping = Path("core/data/src/commonMain/kotlin/com/maxrave/data/mapping/Mapping.kt").read_text()
+          if "googleAccountHeaderRenderer" not in switcher or "googleEmail = googleEmail" not in switcher:
+              raise SystemExit("YouTube account-switcher Google email extraction is missing.")
+          if "googleEmail = this.googleEmail" not in mapping:
+              raise SystemExit("YouTube account Google email is not forwarded into the domain model.")
+          print("Shuffle fallback and selected-account email extraction checks passed.")
+          PY
+
       - name: Keep Insights recovery checkpoints device-local
         run: |
           SETTINGS_SYNC="androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncSettingsSync.kt"
