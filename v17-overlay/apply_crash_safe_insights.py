@@ -383,18 +383,14 @@ def handler(source, platform):
 
     private suspend fun persistListeningCheckpoint(checkpoint: ListeningSessionCheckpoint) {
         listeningPersistenceMutex.withLock {
-            val currentRaw = dataStoreManager.getString(LISTENING_CHECKPOINT_KEY).first()
-            val current = currentRaw?.takeIf { it.isNotBlank() }?.let {
-                runCatching { json.decodeFromString<ListeningSessionCheckpoint>(it) }.getOrNull()
-            }
-            // Do not let a delayed write from the previous track replace a newer session.
-            if (current != null && current.syncId != checkpoint.syncId &&
-                current.startedAt >= checkpoint.startedAt
-            ) return
-            if (current?.syncId == checkpoint.syncId &&
-                current.listenedMillis > checkpoint.listenedMillis
-            ) return
-            dataStoreManager.putString(LISTENING_CHECKPOINT_KEY, json.encodeToString(checkpoint))
+            val raw = dataStoreManager.getString(LISTENING_CHECKPOINT_KEY).first()
+            val checkpoints = raw?.takeIf { it.isNotBlank() }?.let {
+                runCatching { json.decodeFromString<List<ListeningSessionCheckpoint>>(it) }.getOrNull()
+            }.orEmpty()
+            val existing = checkpoints.firstOrNull { it.syncId == checkpoint.syncId }
+            if (existing != null && existing.listenedMillis > checkpoint.listenedMillis) return
+            val updated = checkpoints.filterNot { it.syncId == checkpoint.syncId } + checkpoint
+            dataStoreManager.putString(LISTENING_CHECKPOINT_KEY, json.encodeToString(updated))
         }
     }
 
@@ -421,40 +417,45 @@ def handler(source, platform):
     private suspend fun clearListeningCheckpointIfMatches(syncId: String) {
         val raw = dataStoreManager.getString(LISTENING_CHECKPOINT_KEY).first()
         if (raw.isNullOrBlank()) return
-        val checkpoint = runCatching { json.decodeFromString<ListeningSessionCheckpoint>(raw) }.getOrNull()
-        if (checkpoint?.syncId == syncId) dataStoreManager.putString(LISTENING_CHECKPOINT_KEY, "")
+        val checkpoints = runCatching {
+            json.decodeFromString<List<ListeningSessionCheckpoint>>(raw)
+        }.getOrNull() ?: return
+        val remaining = checkpoints.filterNot { it.syncId == syncId }
+        dataStoreManager.putString(LISTENING_CHECKPOINT_KEY, if (remaining.isEmpty()) "" else json.encodeToString(remaining))
     }
 
     private suspend fun recoverListeningCheckpoint() {
         listeningPersistenceMutex.withLock {
             val raw = dataStoreManager.getString(LISTENING_CHECKPOINT_KEY).first()
             if (raw.isNullOrBlank()) return@withLock
-            val checkpoint = try {
-                json.decodeFromString<ListeningSessionCheckpoint>(raw)
+            val checkpoints = try {
+                json.decodeFromString<List<ListeningSessionCheckpoint>>(raw)
             } catch (e: Exception) {
-                Logger.e(TAG, "Discarding an unreadable Insights checkpoint.", e)
+                Logger.e(TAG, "Discarding unreadable Insights checkpoints.", e)
                 dataStoreManager.putString(LISTENING_CHECKPOINT_KEY, "")
                 return@withLock
             }
-            try {
-                val listenedSeconds = (checkpoint.listenedMillis / 1000L).coerceAtLeast(0L)
-                if (listenedSeconds > 0L) {
-                    analyticsRepository.insertPlaybackEvent(
-                        videoId = checkpoint.videoId,
-                        channelIds = checkpoint.channelIds,
-                        albumBrowseId = checkpoint.albumBrowseId,
-                        durationSecond = checkpoint.durationSecond,
-                        listenedSecond = listenedSeconds,
-                        syncId = checkpoint.syncId,
-                        timestamp = kotlinx.datetime.LocalDateTime.parse(checkpoint.startedAt),
-                    ).collect { eventId ->
-                        Logger.d(TAG, "Recovered interrupted listening session " + checkpoint.syncId + " (event " + eventId + ")")
+            for (checkpoint in checkpoints) {
+                try {
+                    val listenedSeconds = (checkpoint.listenedMillis / 1000L).coerceAtLeast(0L)
+                    if (listenedSeconds > 0L) {
+                        analyticsRepository.insertPlaybackEvent(
+                            videoId = checkpoint.videoId,
+                            channelIds = checkpoint.channelIds,
+                            albumBrowseId = checkpoint.albumBrowseId,
+                            durationSecond = checkpoint.durationSecond,
+                            listenedSecond = listenedSeconds,
+                            syncId = checkpoint.syncId,
+                            timestamp = kotlinx.datetime.LocalDateTime.parse(checkpoint.startedAt),
+                        ).collect { eventId ->
+                            Logger.d(TAG, "Recovered interrupted listening session " + checkpoint.syncId + " (event " + eventId + ")")
+                        }
                     }
+                    clearListeningCheckpointIfMatches(checkpoint.syncId)
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    Logger.e(TAG, "Could not recover Insights checkpoint; it will be retried next launch.", e)
                 }
-                dataStoreManager.putString(LISTENING_CHECKPOINT_KEY, "")
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-                Logger.e(TAG, "Could not recover Insights checkpoint; it will be retried next launch.", e)
             }
         }
     }
