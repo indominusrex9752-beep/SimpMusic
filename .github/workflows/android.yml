@@ -142,7 +142,18 @@ jobs:
               new = "if (elapsedMillis > 0L && positionDelta >= (elapsedMillis / 10L).coerceAtLeast(1L) && positionDelta <= plausibleMaximum) {"
               if old not in source:
                   raise SystemExit("Could not find the expected accumulator condition; refusing an unsafe edit.")
-              accumulator.write_text(source.replace(old, new, 1))
+              source = source.replace(old, new, 1)
+              null_song_old = "        if (currentSong == null) return null"
+              null_song_new = """        if (currentSong == null) {
+                    // Do not let an interval without a verified current track accrue to the next tick.
+                    lastPositionMillis = positionMillis
+                    lastTick = TimeSource.Monotonic.markNow()
+                    return null
+                }"""
+              if null_song_old not in source:
+                  raise SystemExit("Could not find the expected null-song guard; refusing an unsafe edit.")
+              source = source.replace(null_song_old, null_song_new, 1)
+              accumulator.write_text(source)
 
           print(f"Successfully merged {len(merged)} Insights files with the 2.7.0 source.")
           print("Duplicate import removed; stalled-position intervals are excluded.")
@@ -174,6 +185,8 @@ jobs:
           expected_guard = "positionDelta >= (elapsedMillis / 10L).coerceAtLeast(1L)"
           if expected_guard not in accumulator:
               raise SystemExit("Playback tracker still accepts a zero-progress stall.")
+          if "if (currentSong == null) {" not in accumulator or "lastPositionMillis = positionMillis" not in accumulator:
+              raise SystemExit("Playback tracker does not reset its baseline when the current song is unavailable.")
 
           repository = (root / required[1]).read_text()
           duplicate_import = "import kotlinx.coroutines.withContext"
