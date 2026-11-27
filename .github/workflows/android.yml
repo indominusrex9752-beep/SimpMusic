@@ -159,6 +159,9 @@ jobs:
           print("Duplicate import removed; stalled-position intervals are excluded.")
           PY
 
+      - name: Apply crash-safe Insights checkpoints
+        run: python3 v17-overlay/apply_crash_safe_insights.py
+
       - name: Validate merged Insights implementation
         run: |
           python3 - <<'PY'
@@ -207,6 +210,23 @@ jobs:
               handler = (root / handler_path).read_text()
               if "listeningAccumulator.tick" not in handler or "saveListeningSession" not in handler:
                   raise SystemExit(f"Playback listening tracking is not wired into {handler_path}.")
+
+          checkpoint_source = accumulator
+          if "ListeningSessionCheckpoint" not in checkpoint_source or "sessionSyncId = newSyncId()" not in checkpoint_source:
+              raise SystemExit("Durable, uniquely identified listening checkpoints are missing.")
+          if "lastCheckpointMillis < 30_000L" not in checkpoint_source or "listenedMillis - lastCheckpointMillis < 2_000L" not in checkpoint_source:
+              raise SystemExit("Checkpoint cadence or immediate 30-second threshold persistence is missing.")
+          dao_checkpoint = (root / required[2]).read_text()
+          if "getPlaybackEventBySyncId" not in dao_checkpoint or "updatePlaybackEvent(existing.copy(listenedSecond = listenedSecond))" not in dao_checkpoint:
+              raise SystemExit("Recovered Insights events are not idempotent.")
+          datasource = (root / "core/data/src/commonMain/kotlin/com/maxrave/data/db/datasource/AnalyticsDatasource.kt").read_text()
+          if "stableSyncId" not in datasource or "syncRecorder.play(stableSyncId)" not in datasource:
+              raise SystemExit("Checkpoint recovery is not connected to the existing history-sync event.")
+          for handler_path in required[3:5]:
+              handler = (root / handler_path).read_text()
+              for marker in ("listeningRecoveryReady.await()", "persistListeningCheckpoint", "recoverListeningCheckpoint", "persistCompletedListeningSession"):
+                  if marker not in handler:
+                      raise SystemExit(f"Crash-safe checkpoint marker {marker} is missing from {handler_path}.")
 
           screen = (root / required[7]).read_text()
           if "CUSTOM_RANGE" not in screen or "DateRangePicker" not in screen:
