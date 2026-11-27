@@ -1580,6 +1580,7 @@ class SettingsViewModel(
 
     private fun refreshSelectedYouTubeGoogleEmail() {
         viewModelScope.launch {
+            _selectedYouTubeGoogleEmail.value = null
             val email = try {
                 val cookie = dataStoreManager.cookie.first()
                 val pageId = dataStoreManager.pageId.first()
