@@ -12,5 +12,5 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncS
                  "lyrics_provider", "translation_language", "use_translation_language", "use_ai_translation",
                  "spotify_lyrics", "lyrics_style", "romanization_languages", "youtube_subtitle_language",
 -                "preferred_audio_language",
-+                "preferred_audio_language", "animated_lyrics_background", "lyrics_background_pulse", "ai_provider", "custom_model_id",
++                "preferred_audio_language", "animated_lyrics_background", "lyrics_background_pulse",
              ),
