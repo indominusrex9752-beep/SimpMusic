@@ -43,6 +43,7 @@ jobs:
           def run(args, **kwargs):
               return subprocess.run(args, check=True, **kwargs)
 
+          run(["git", "fetch", "https://github.com/maxrave-dev/SimpMusic.git", main_base, main_head])
           core_base_line = run(
               ["git", "ls-tree", main_base, "core"],
               text=True, stdout=subprocess.PIPE
