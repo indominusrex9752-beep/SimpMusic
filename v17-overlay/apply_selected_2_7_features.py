@@ -474,6 +474,76 @@ def patch_shared_view_model(source: str) -> str:
     return source
 edit(SHARED_VM, patch_shared_view_model)
 
+# The custom 2.6 lyrics state did not carry the song id. V17's Delete Lyrics action must
+# retain the exact song identity even if playback changes while the confirmation sheet is open.
+def patch_lyrics_identity(source: str) -> str:
+    data_anchor = (
+        "    data class LyricsData(\n"
+        "        val lyrics: Lyrics,\n"
+    )
+    if "data class LyricsData(\n        val videoId: String" not in source:
+        source = replace_once(
+            source,
+            data_anchor,
+            "    data class LyricsData(\n        val videoId: String = \"\",\n        val lyrics: Lyrics,\n",
+            "LyricsData song identity",
+        )
+    constructor_anchor = (
+        "                                NowPlayingScreenData.LyricsData(\n"
+        "                                    lyrics = lyrics,\n"
+    )
+    if "NowPlayingScreenData.LyricsData(\n                                    videoId = videoId," not in source:
+        source = replace_once(
+            source,
+            constructor_anchor,
+            "                                NowPlayingScreenData.LyricsData(\n"
+            "                                    videoId = videoId,\n"
+            "                                    lyrics = lyrics,\n",
+            "LyricsData song identity assignment",
+        )
+    return source
+edit(SHARED_VM, patch_lyrics_identity)
+
+# The newer core requires the exact playlist-row id when deleting. Resolve it before removing
+# the row so duplicate copies of a song are handled safely.
+NOW_PLAYING_VM = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/NowPlayingBottomSheetViewModel.kt"
+def patch_bottom_sheet_pair_id(source: str) -> str:
+    import_line = "import kotlinx.coroutines.flow.lastOrNull\n"
+    if "import kotlinx.coroutines.flow.firstOrNull\n" not in source:
+        source = replace_once(source, import_line, import_line + "import kotlinx.coroutines.flow.firstOrNull\n", "playlist pair lookup import")
+    old = """                    localPlaylistRepository
+                        .removeTrackFromLocalPlaylist(
+                            id = ev.playlistId,
+                            song =
+                                songRepository.getSongById(ev.videoId).lastOrNull() ?: run {
+                                    makeToast(getString(Res.string.error_occurred))
+                                    return@launch
+                                },
+                            successMessage = getString(Res.string.delete_song_from_playlist),
+"""
+    new = """                    val song =
+                        songRepository.getSongById(ev.videoId).lastOrNull() ?: run {
+                            makeToast(getString(Res.string.error_occurred))
+                            return@launch
+                        }
+                    val pairId =
+                        localPlaylistRepository.getPlaylistPairOfSong(ev.playlistId, ev.videoId).firstOrNull()?.id
+                            ?: run {
+                                makeToast(getString(Res.string.error_occurred))
+                                return@launch
+                            }
+                    localPlaylistRepository
+                        .removeTrackFromLocalPlaylist(
+                            id = ev.playlistId,
+                            song = song,
+                            pairId = pairId,
+                            successMessage = getString(Res.string.delete_song_from_playlist),
+"""
+    if "pairId = pairId," not in source:
+        source = replace_once(source, old, new, "single-row playlist removal pair id")
+    return source
+edit(NOW_PLAYING_VM, patch_bottom_sheet_pair_id)
+
 # Add only the non-AI V17 preference keys to the settings-sync allowlist.
 SYNC_SETTINGS = "androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncSettingsSync.kt"
 def patch_sync_keys(source: str) -> str:
