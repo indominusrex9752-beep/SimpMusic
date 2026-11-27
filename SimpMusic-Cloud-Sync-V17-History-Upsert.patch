@@ -1,0 +1,24 @@
+diff --git a/data/src/commonMain/kotlin/com/maxrave/data/db/SyncDao.kt b/data/src/commonMain/kotlin/com/maxrave/data/db/SyncDao.kt
+index 0000000..0000000 100644
+--- a/data/src/commonMain/kotlin/com/maxrave/data/db/SyncDao.kt
++++ b/data/src/commonMain/kotlin/com/maxrave/data/db/SyncDao.kt
+@@ -4,6 +4,7 @@ import androidx.room.Insert
+ import androidx.room.OnConflictStrategy
+ import androidx.room.Query
+ import androidx.room.Transaction
++import androidx.room.Update
+ import com.maxrave.domain.data.entities.AlbumEntity
+ import com.maxrave.domain.data.entities.ArtistEntity
+ import com.maxrave.domain.data.entities.LocalPlaylistEntity
+@@ -247,6 +248,12 @@ interface SyncDao {
+     @Query("SELECT COUNT(*) FROM playback_event WHERE syncId = :syncId")
+     suspend fun eventCount(syncId: String): Int
+ 
++    @Query("SELECT * FROM playback_event WHERE syncId = :syncId LIMIT 1")
++    suspend fun getPlaybackEventBySyncId(syncId: String): PlaybackEventEntity?
++
++    @Update
++    suspend fun updatePlaybackEvent(event: PlaybackEventEntity)
++
+     @Insert(onConflict = OnConflictStrategy.IGNORE)
+     suspend fun insertEvent(event: PlaybackEventEntity): Long
