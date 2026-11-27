@@ -17,7 +17,7 @@ jobs:
       - name: Use patched core
         run: |
           git submodule set-url core https://github.com/indominusrex9752-beep/core.git
-          git -C core fetch origin patch-1
+          git -C core fetch origin Version-Upgrade
           git -C core checkout FETCH_HEAD
 
       - name: Apply SimpMusic Insights patch
