@@ -12,6 +12,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: Version-Upgrade
+          fetch-depth: 0
           submodules: recursive
 
       - name: Use SimpCloud core
@@ -19,6 +20,9 @@ jobs:
           git submodule set-url core https://github.com/indominusrex9752-beep/core.git
           CORE_SHA="88c1cf256f57ca07d90993d5fc966e96a71ecedb"
           git -C core fetch origin "$CORE_SHA"
+          if [ "$(git -C core rev-parse --is-shallow-repository)" = "true" ]; then
+            git -C core fetch --unshallow origin '+refs/heads/*:refs/remotes/origin/*'
+          fi
           git -C core checkout --detach "$CORE_SHA"
           test "$(git -C core rev-parse HEAD)" = "$CORE_SHA"
 
