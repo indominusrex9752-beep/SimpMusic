@@ -125,14 +125,14 @@ if home_styles.is_file():
 # destination is not a user-facing feature.
 LIBRARY_SCREEN = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/library/LibraryScreen.kt"
 def expose_radio_builder(source: str) -> str:
-    import_anchor = "import androidx.compose.material3.Text\\n"
-    if "import androidx.compose.material3.TextButton\\n" not in source:
-        source = replace_once(source, import_anchor, import_anchor + "import androidx.compose.material3.TextButton\\n", "Radio Builder button import")
-    destination_anchor = "import com.maxrave.simpmusic.ui.navigation.destination.home.ListenTogetherDestination\\n"
-    if "import com.maxrave.simpmusic.ui.navigation.destination.home.RadioBuilderDestination\\n" not in source:
-        source = replace_once(source, destination_anchor, destination_anchor + "import com.maxrave.simpmusic.ui.navigation.destination.home.RadioBuilderDestination\\n", "Radio Builder destination import")
-    action_anchor = "                ListenTogetherIconButton { navController.navigate(ListenTogetherDestination) }\\n"
-    radio_action = action_anchor + "                TextButton(onClick = { navController.navigate(RadioBuilderDestination) }) { Text(\\"Radio Builder\\") }\\n"
+    import_anchor = "import androidx.compose.material3.Text\n"
+    if "import androidx.compose.material3.TextButton\n" not in source:
+        source = replace_once(source, import_anchor, import_anchor + "import androidx.compose.material3.TextButton\n", "Radio Builder button import")
+    destination_anchor = "import com.maxrave.simpmusic.ui.navigation.destination.home.ListenTogetherDestination\n"
+    if "import com.maxrave.simpmusic.ui.navigation.destination.home.RadioBuilderDestination\n" not in source:
+        source = replace_once(source, destination_anchor, destination_anchor + "import com.maxrave.simpmusic.ui.navigation.destination.home.RadioBuilderDestination\n", "Radio Builder destination import")
+    action_anchor = "                ListenTogetherIconButton { navController.navigate(ListenTogetherDestination) }\n"
+    radio_action = action_anchor + "                TextButton(onClick = { navController.navigate(RadioBuilderDestination) }) { Text(\"Radio Builder\") }\n"
     if "navController.navigate(RadioBuilderDestination)" not in source:
         source = replace_once(source, action_anchor, radio_action, "Visible Radio Builder library action")
     return source
