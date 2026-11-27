@@ -3305,7 +3305,7 @@ fun SettingScreen(
                                             Text(
                                                 text = selectedGoogleEmail?.let { email ->
                                                     "SimpCloud Google identity: $email"
-                                                } ?: "SimpCloud matching unavailable: YouTube did not provide this account's Google email. Sync remains disabled.",
+                                                } ?: "SimpCloud matching unavailable: Google email for this YouTube account could not be verified. Sync remains disabled.",
                                                 style = typo().bodySmall,
                                                 color = if (selectedGoogleEmail == null) {
                                                     MaterialTheme.colorScheme.error
