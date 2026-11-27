@@ -517,11 +517,11 @@ class PlaylistViewModel(
             }
 
             PlaylistUIEvent.Shuffle -> {
-                val shuffleEndpoint = data.shuffleEndpoint
+                val originalShuffleEndpoint = data.shuffleEndpoint
 
-                // Preserve V16's complete-playlist fallback when YouTube provides no shuffle endpoint.
-                // Do not shuffle only the currently loaded page: fetch every continuation first.
-                if (shuffleEndpoint == null) {
+                // V16 fallback: if YouTube supplied no shuffle endpoint but more playlist pages
+                // remain, load the complete playlist before shuffling it.
+                if (originalShuffleEndpoint == null && !continuation.value.isNullOrEmpty()) {
                     viewModelScope.launch {
                         try {
                             val allTracks = tracks.value.toMutableList()
@@ -584,7 +584,15 @@ class PlaylistViewModel(
                     return
                 }
 
-                // Keep the 2.7.0 radio-endpoint path for playlists that provide a valid endpoint.
+                // Keep the official 2.7.0 endpoint construction and local/offline fallback.
+                val playlistId = data.id.removePrefix("VL")
+                val shuffleEndpoint =
+                    originalShuffleEndpoint
+                        ?: YouTubeWatchEndpoint(
+                            playlistId = playlistId,
+                            params = if (playlistId.startsWith("RD")) RADIO_SHUFFLE_PARAMS else SHUFFLE_PARAMS,
+                        )
+
                 viewModelScope.launch {
                     songRepository.getRadioFromEndpoint(shuffleEndpoint).collectLatest { res ->
                         val shuffledTracks = res.data?.first.orEmpty()
