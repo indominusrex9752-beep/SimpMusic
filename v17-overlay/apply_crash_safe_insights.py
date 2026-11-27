@@ -298,6 +298,11 @@ def handler(source, platform):
             "import kotlinx.coroutines.CancellationException",
             "import kotlinx.coroutines.CancellationException\nimport kotlinx.coroutines.CompletableDeferred",
             platform + " handler coroutine imports")
+    if "import kotlinx.serialization.decodeFromString" not in source:
+        source = replace_once(source,
+            "import kotlinx.serialization.json.Json",
+            "import kotlinx.serialization.decodeFromString\\nimport kotlinx.serialization.encodeToString\\nimport kotlinx.serialization.json.Json",
+            platform + " handler serialization imports")
     tag_line = re.search(r"private (?:const )?val TAG = [^\n]+\n", source)
     if not tag_line:
         raise SystemExit(platform + ": could not find TAG declaration.")
