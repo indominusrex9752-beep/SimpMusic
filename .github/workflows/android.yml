@@ -58,6 +58,7 @@ jobs:
               "https://github.com/maxrave-dev/core.git", core_base
           ])
           run(["git", "-C", "core", "cat-file", "-e", f"{core_base}^{{commit}}"])
+          run(["git", "-C", "core", "merge-base", "--is-ancestor", core_base, "HEAD"])
 
           merged = {}
           conflicts = []
