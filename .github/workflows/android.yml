@@ -1,10 +1,7 @@
-name: SimpMusic Debug APK V16 (SimpCloud Full Settings Sync)
+name: SimpMusic Debug APK V17 (Version Upgrade 2.7)
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - Cloud-Sync
 
 jobs:
   build:
@@ -14,7 +11,7 @@ jobs:
       - name: Checkout SimpMusic
         uses: actions/checkout@v6
         with:
-          ref: Cloud-Sync
+          ref: Version-Upgrade
           submodules: recursive
 
       - name: Use patched core
