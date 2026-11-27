@@ -87,4 +87,19 @@ for target, data in merged_core.items():
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(data)
 
+# Remove only byte-for-byte duplicate import lines from the legacy archive. This is
+# source hygiene, not a change to Insights behavior or tracking.
+repository = Path("core/data/src/commonMain/kotlin/com/maxrave/data/repository/AnalyticsRepositoryImpl.kt")
+if repository.exists():
+    lines = repository.read_text().splitlines()
+    seen = set()
+    cleaned = []
+    for line in lines:
+        if line.startswith("import ") and line in seen:
+            continue
+        if line.startswith("import "):
+            seen.add(line)
+        cleaned.append(line)
+    repository.write_text("\\n".join(cleaned) + "\\n")
+
 print(f"Applied {len(app_files)} custom Insights app files and merged {len(merged_core)} core files into the pinned 2.7 core.")
