@@ -36,17 +36,25 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
 +        // Both page ID and authuser index are required because one Google login can own
 +        // multiple YouTube channels and multiple Google accounts can share one cookie jar.
 +        val cookie = dataStoreManager.cookie.first()
-+        val selectedPageId = dataStoreManager.pageId.first()
++        val selectedPageId = dataStoreManager.pageId.first().trim()
 +        val selectedAuthUser = dataStoreManager.authUser.first()
-+        if (cookie.isBlank() || selectedPageId.isBlank()) {
-+            throw IllegalStateException("The selected YouTube account has no page ID. SimpCloud sync must remain disabled.")
++        if (cookie.isBlank()) {
++            throw IllegalStateException("YouTube session is unavailable. SimpCloud sync must remain disabled.")
 +        }
 +
-+        val selectedAccount = accountRepository.getAccountInfo(cookie).first()
-+            .firstOrNull { it.pageId == selectedPageId && it.authUser == selectedAuthUser }
-+            ?: throw IllegalStateException("The selected YouTube account could not be matched safely. SimpCloud sync must remain disabled.")
-+        val youtubeEmail = selectedAccount.googleEmail?.trim()?.takeIf { it.contains("@") }
-+            ?: throw IllegalStateException("The selected account was found, but YouTube did not provide its Google email. Sync must remain disabled.")
++        // pageId is absent for some valid Google sessions. In that case resolve identity
++        // from YouTube's account list by authuser index and verified Google email instead
++        // of rejecting the session before asking YouTube for its account metadata.
++        val accountInfos = accountRepository.getAccountInfo(cookie).first()
++        val candidates = accountInfos.filter { account ->
++            account.authUser == selectedAuthUser &&
++                (selectedPageId.isBlank() || account.pageId == selectedPageId)
++        }
++        val matchingEmails = candidates.mapNotNull { account ->
++            account.googleEmail?.trim()?.takeIf { it.contains("@") }
++        }.distinctBy { it.lowercase() }
++        val youtubeEmail = matchingEmails.singleOrNull()
++            ?: throw IllegalStateException("YouTube could not uniquely verify the selected Google account. SimpCloud sync must remain disabled.")
 +        if (!youtubeEmail.equals(cloudEmail, ignoreCase = true)) {
 +            throw IllegalStateException("The SimpCloud Google account does not match the selected YouTube account. Sync must remain disabled.")
 +        }
