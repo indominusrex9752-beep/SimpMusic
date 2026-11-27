@@ -76,8 +76,8 @@ diff = run(
 ).stdout
 if not diff:
     raise SystemExit("No selected 2.7 feature changes were found between the custom and upgrade branches.")
-run(["git", "apply", "--check", "-"], input=diff)
-run(["git", "apply", "-"], input=diff)
+run(["git", "apply", "--check"], input=diff)
+run(["git", "apply"], input=diff)
 print("Applied the selected 2.7 app, library, lyrics, theme, equalizer and desktop changes.")
 
 # Add only resources used by the selected features. Search Settings, app icons and AI-provider
