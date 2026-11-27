@@ -344,6 +344,21 @@ def handler(source, platform):
         }""",
         platform + " handler seek checkpoint")
 
+    # The upstream 2.7 percentage-based tracker must not run beside the fixed 30-second
+    # accumulator: it would create duplicate events and count short plays prematurely.
+    legacy_call = re.compile(
+        r"        val lastPlayed = nowPlayingState\\.value\\.songEntity\\n"
+        r"        val currentState = simpleMediaState\\.value\\n"
+        r"        if \\(currentState is SimpleMediaState\\.Progress && lastPlayed != null && lastPlayed\\.durationSeconds > 0\\) \\{\\n"
+        r"            mayBeTrackingListeningLocal\\(lastPlayed, currentState\\.progress\\)\\n"
+        r"        \\}\\n"
+    )
+    legacy_calls = list(legacy_call.finditer(source))
+    if len(legacy_calls) > 1:
+        raise SystemExit(platform + ": found multiple legacy local-tracking call sites.")
+    if legacy_calls:
+        source = source[:legacy_calls[0].start()] + source[legacy_calls[0].end():]
+
     start = source.find("    private fun saveListeningSession(session: CompletedListeningSession) {")
     if start < 0:
         raise SystemExit(platform + ": saveListeningSession method not found.")
@@ -440,6 +455,18 @@ def handler(source, platform):
     }
 """
     source = source[:start] + replacement + source[end:]
+
+    # A merged 2.7 handler can still contain the now-unused legacy helper if it landed
+    # before saveListeningSession. Remove it as well, so no percentage-based writer remains.
+    legacy_method = re.compile(
+        r"    private fun mayBeTrackingListeningLocal\\(\\n.*?^    \\}\\n",
+        re.MULTILINE | re.DOTALL,
+    )
+    legacy_methods = list(legacy_method.finditer(source))
+    if len(legacy_methods) > 1:
+        raise SystemExit(platform + ": found multiple legacy local-tracking helpers.")
+    if legacy_methods:
+        source = source[:legacy_methods[0].start()] + source[legacy_methods[0].end():]
 
     release_start = source.find("            listeningAccumulator.finish()?.let { session ->")
     if release_start < 0:
