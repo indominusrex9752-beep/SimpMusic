@@ -286,7 +286,7 @@ def patch_settings_view_model(source: str) -> str:
     if "_titleMarquee" not in source:
         source = replace_once(source, state_anchor, state_anchor + state_addition, "selected preference state")
 
-    init_anchor = "        getEnableLiquidGlass()\n"
+    init_anchor = "        getUpdateChannel()\n        getEnableLiquidGlass()\n        getExplicitContentEnabled()\n"
     init_addition = (
         "        viewModelScope.launch { dataStoreManager.getString(\"title_marquee\").collect { _titleMarquee.value = it != DataStoreManager.FALSE } }\n"
         "        viewModelScope.launch { dataStoreManager.getString(\"animated_lyrics_background\").collect { _animatedLyricsBackground.value = it == DataStoreManager.TRUE } }\n"
