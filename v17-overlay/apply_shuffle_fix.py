@@ -17,8 +17,8 @@ if "import kotlinx.coroutines.CancellationException\n" not in source:
     source = source.replace(import_anchor, "import kotlinx.coroutines.CancellationException\n" + import_anchor, 1)
 
 event_anchor = "            PlaylistUIEvent.Shuffle -> {\n"
-official_comment = "                // A playlist opened offline (#2083), or a header whose Shuffle the parser cannot read, has no\n"
-if source.count(event_anchor) != 1 or source.count(official_comment) != 1:
+shuffle_anchor = "                val playlistId = data.id.removePrefix(\\"VL\\")\\n"
+if source.count(event_anchor) != 1 or source.count(shuffle_anchor) != 1:
     raise SystemExit("The official 2.7 shuffle block has changed; refusing an unsafe insertion.")
 
 fallback = """                // V17 full-playlist fallback: load every continuation page before shuffling.
@@ -85,6 +85,6 @@ fallback = """                // V17 full-playlist fallback: load every continua
                 }
 
 """
-source = source.replace(official_comment, fallback + official_comment, 1)
+source = source.replace(shuffle_anchor, fallback + shuffle_anchor, 1)
 path.write_text(source)
 print("Applied the V17 shuffle fallback without replacing official 2.7 PlaylistViewModel code.")
