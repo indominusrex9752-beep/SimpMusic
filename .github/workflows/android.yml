@@ -335,6 +335,11 @@ jobs:
           git apply --check SimpMusic-Cloud-Sync-V17-Account-Matching.patch
           git apply SimpMusic-Cloud-Sync-V17-Account-Matching.patch
 
+      - name: Add idempotent synced playback history updates
+        run: |
+          git apply --check SimpMusic-Cloud-Sync-V17-History-Upsert.patch
+          git apply SimpMusic-Cloud-Sync-V17-History-Upsert.patch
+
       - name: Apply SimpCloud V15 immediate manual sync
         run: |
           git apply --check SimpMusic-Cloud-Sync-V15-ManualSync.patch
