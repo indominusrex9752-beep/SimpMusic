@@ -302,6 +302,8 @@ def sync_applier(source):
             // event without creating a second history entry on this device.
             if (event.listenedSecond > existing.listenedSecond) {
                 dao.updatePlaybackEvent(existing.copy(listenedSecond = event.listenedSecond))
+                // The host must log this newer version so already-paired devices receive it too.
+                return true
             }
             return false
         }
