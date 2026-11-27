@@ -207,6 +207,7 @@ def analytics_datasource(source):
         timestamp: LocalDateTime? = null,
     ): Long {
         val stableSyncId = syncId ?: newSyncId()
+        val eventAlreadyExists = databaseDao.getPlaybackEventBySyncId(stableSyncId) != null
         val eventId =
             databaseDao.insertPlaybackWithArtists(
                 videoId = videoId,
@@ -217,7 +218,7 @@ def analytics_datasource(source):
                 syncId = stableSyncId,
                 timestamp = timestamp ?: now(),
             )
-        syncRecorder.play(stableSyncId)""",
+        if (!eventAlreadyExists) syncRecorder.play(stableSyncId)""",
         "AnalyticsDatasource.insertPlaybackEvent")
 edit("core/data/src/commonMain/kotlin/com/maxrave/data/db/datasource/AnalyticsDatasource.kt", analytics_datasource)
 
@@ -261,7 +262,7 @@ def dao(source):
         // checkpoint is cleared. Reuse the same row instead of creating a second play.
         val existing = syncId?.let { getPlaybackEventBySyncId(it) }
         if (existing != null) {
-            updatePlaybackEvent(existing.copy(listenedSecond = listenedSecond))
+            updatePlaybackEvent(existing.copy(listenedSecond = maxOf(existing.listenedSecond, listenedSecond)))
             return existing.eventId
         }
 
