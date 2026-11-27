@@ -207,7 +207,6 @@ def analytics_datasource(source):
         timestamp: LocalDateTime? = null,
     ): Long {
         val stableSyncId = syncId ?: newSyncId()
-        val eventAlreadyExists = databaseDao.getPlaybackEventBySyncId(stableSyncId) != null
         val eventId =
             databaseDao.insertPlaybackWithArtists(
                 videoId = videoId,
@@ -218,7 +217,7 @@ def analytics_datasource(source):
                 syncId = stableSyncId,
                 timestamp = timestamp ?: now(),
             )
-        if (!eventAlreadyExists) syncRecorder.play(stableSyncId)""",
+        syncRecorder.play(stableSyncId)""",
         "AnalyticsDatasource.insertPlaybackEvent")
 edit("core/data/src/commonMain/kotlin/com/maxrave/data/db/datasource/AnalyticsDatasource.kt", analytics_datasource)
 
