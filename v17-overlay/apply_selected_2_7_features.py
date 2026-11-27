@@ -325,6 +325,71 @@ def patch_shared_view_model(source: str) -> str:
     addition = "    fun getTitleMarquee(): Flow<Boolean> = dataStoreManager.getString(\"title_marquee\").map { it != FALSE }\n"
     if "fun getTitleMarquee()" not in source:
         source = replace_once(source, anchor, anchor + addition, "title marquee getter")
+
+    delete_methods = """
+    /**
+     * Remove the exact lyrics shown when the song menu was opened, without changing the custom
+     * Insights or playback code in this viewmodel.
+     */
+    fun deleteLyrics(shown: NowPlayingScreenData.LyricsData) {
+        val videoId = shown.videoId
+        val onScreen = _nowPlayingScreenData.value.lyricsData
+        if (onScreen != null && onScreen.videoId == videoId && onScreen.lyrics == shown.lyrics) {
+            resetLyricsVoteState()
+            _nowPlayingScreenData.update { it.copy(lyricsData = null, lyricsNotFound = true) }
+        }
+        val translatedId = shown.translatedLyrics?.takeIf { it.second == LyricsProvider.SIMPMUSIC }?.first?.simpMusicLyrics?.id
+        viewModelScope.launch {
+            lyricsCanvasRepository.deleteLyrics(
+                videoId,
+                listOfNotNull(
+                    shown.lyrics.id
+                        ?.takeIf { shown.lyricsProvider != LyricsProvider.OFFLINE }
+                        ?.let { shown.lyricsProvider.name to it },
+                    translatedId?.let { LyricsProvider.SIMPMUSIC.name to it },
+                ),
+            )
+        }
+        val lyricsId = shown.lyrics.simpMusicLyrics?.id
+        if (shown.lyricsProvider == LyricsProvider.SIMPMUSIC && lyricsId != null) {
+            viewModelScope.launch { removeFromSimpMusic(lyricsId, translated = false) }
+        }
+        if (translatedId != null) {
+            viewModelScope.launch { removeFromSimpMusic(translatedId, translated = true) }
+        }
+    }
+
+    private suspend fun removeFromSimpMusic(
+        id: String,
+        translated: Boolean,
+    ) {
+        val email = dataStoreManager.contributorEmail.first().trim()
+        val deleted =
+            email.isNotEmpty() &&
+                (
+                    if (translated) {
+                        lyricsCanvasRepository.deleteSimpMusicTranslatedLyrics(id, email)
+                    } else {
+                        lyricsCanvasRepository.deleteSimpMusicLyrics(id, email)
+                    }
+                ).first() is Resource.Success
+        if (!deleted) {
+            if (translated) {
+                lyricsCanvasRepository.voteSimpMusicTranslatedLyrics(id, false).first()
+            } else {
+                lyricsCanvasRepository.voteSimpMusicLyrics(id, false).first()
+            }
+        }
+    }
+
+"""
+    if "fun deleteLyrics(" not in source:
+        source = replace_once(
+            source,
+            "    fun loadSharedMediaItem(videoId: String) {",
+            delete_methods + "    fun loadSharedMediaItem(videoId: String) {",
+            "Delete Lyrics action",
+        )
     return source
 edit(SHARED_VM, patch_shared_view_model)
 
