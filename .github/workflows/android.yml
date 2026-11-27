@@ -23,7 +23,6 @@ jobs:
           mkdir -p v17-overlay
           git show origin/Version-Upgrade:v17-overlay/merge_custom_insights.py > v17-overlay/merge_custom_insights.py
           git show origin/Version-Upgrade:v17-overlay/apply_selected_2_7_features.py > v17-overlay/apply_selected_2_7_features.py
-          git show origin/Version-Upgrade:SimpMusic-Cloud-Sync-V17-Account-Matching.patch > SimpMusic-Cloud-Sync-V17-Account-Matching.patch
           git show origin/Version-Upgrade:SimpMusic-Cloud-Sync-V17-History-Upsert.patch > SimpMusic-Cloud-Sync-V17-History-Upsert.patch
 
       - name: Pin the 2.7-compatible SimpCloud core
@@ -105,11 +104,6 @@ jobs:
         run: |
           git apply --check SimpMusic-Cloud-Sync-V14-Realtime.patch
           git apply SimpMusic-Cloud-Sync-V14-Realtime.patch
-
-      - name: Enforce selected YouTube and SimpCloud account matching
-        run: |
-          git apply --recount --check SimpMusic-Cloud-Sync-V17-Account-Matching.patch
-          git apply --recount SimpMusic-Cloud-Sync-V17-Account-Matching.patch
 
       - name: Apply SimpCloud V15 immediate manual sync
         run: |
@@ -210,28 +204,6 @@ jobs:
               if key not in resources:
                   raise SystemExit(f"Selected feature resource is missing: {key}")
           print("Radio Builder, Replay Mix, lyrics, AMOLED, desktop, settings and shuffle checks passed.")
-          PY
-
-      - name: Validate selected YouTube and SimpCloud account matching
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          settings_vm = Path("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SettingsViewModel.kt").read_text()
-          settings_ui = Path("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt").read_text()
-          auth = Path("androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncAuth.kt").read_text()
-          switcher = Path("core/service/kotlinYtmusicScraper/src/commonMain/kotlin/com/maxrave/kotlinytmusicscraper/models/response/AccountSwitcherEndpointResponse.kt").read_text()
-          mapping = Path("core/data/src/commonMain/kotlin/com/maxrave/data/mapping/Mapping.kt").read_text()
-          if "selectedYouTubeGoogleEmail" not in settings_vm or "refreshSelectedYouTubeGoogleEmail()" not in settings_vm:
-              raise SystemExit("Selected YouTube Google identity lookup is missing.")
-          if "SimpCloud matching unavailable" not in settings_ui or "YouTube Google email:" not in settings_ui:
-              raise SystemExit("The selected-account matching diagnostic is missing.")
-          if "selectedAccount.googleEmail" not in auth or "cloudEmail" not in auth:
-              raise SystemExit("SimpCloud does not compare the authenticated Google identity with the selected YouTube account.")
-          if "googleAccountHeaderRenderer" not in switcher or "googleEmail = googleEmail" not in switcher:
-              raise SystemExit("YouTube account-switcher email extraction is missing.")
-          if "googleEmail = this.googleEmail" not in mapping:
-              raise SystemExit("YouTube Google email is not forwarded into the domain model.")
-          print("Selected YouTube identity and SimpCloud account-matching checks passed.")
           PY
 
       - name: Final source hygiene
