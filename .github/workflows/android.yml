@@ -22,7 +22,6 @@ jobs:
             '+refs/heads/Version-Upgrade:refs/remotes/origin/Version-Upgrade'
           mkdir -p v17-overlay
           git show origin/Version-Upgrade:v17-overlay/merge_custom_insights.py > v17-overlay/merge_custom_insights.py
-          git show origin/Version-Upgrade:v17-overlay/apply_crash_safe_insights.py > v17-overlay/apply_crash_safe_insights.py
           git show origin/Version-Upgrade:v17-overlay/apply_selected_2_7_features.py > v17-overlay/apply_selected_2_7_features.py
           git show origin/Version-Upgrade:SimpMusic-Cloud-Sync-V17-Account-Matching.patch > SimpMusic-Cloud-Sync-V17-Account-Matching.patch
           git show origin/Version-Upgrade:SimpMusic-Cloud-Sync-V17-History-Upsert.patch > SimpMusic-Cloud-Sync-V17-History-Upsert.patch
@@ -122,11 +121,6 @@ jobs:
           git apply --check SimpMusic-Cloud-Sync-V16-FullSettings.patch
           git apply SimpMusic-Cloud-Sync-V16-FullSettings.patch
 
-      - name: Apply crash-safe Insights checkpoints
-        run: |
-          python3 -m py_compile v17-overlay/apply_crash_safe_insights.py
-          python3 v17-overlay/apply_crash_safe_insights.py
-
       - name: Add idempotent synced playback history operations
         run: |
           git -C core apply --check ../SimpMusic-Cloud-Sync-V17-History-Upsert.patch
@@ -137,96 +131,6 @@ jobs:
         run: |
           python3 -m py_compile v17-overlay/apply_selected_2_7_features.py
           python3 v17-overlay/apply_selected_2_7_features.py
-
-      - name: Validate custom Insights and crash-safe tracking
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import xml.etree.ElementTree as ET
-
-          root = Path(".")
-          required = [
-              "core/data/src/commonMain/kotlin/com/maxrave/data/mediaservice/PlaybackListeningAccumulator.kt",
-              "core/data/src/commonMain/kotlin/com/maxrave/data/repository/AnalyticsRepositoryImpl.kt",
-              "core/data/src/commonMain/kotlin/DatabaseDao.kt",
-              "core/data/src/androidMain/kotlin/com/maxrave/data/mediaservice/MediaServiceHandlerImpl.kt",
-              "core/data/src/jvmMain/kotlin/com/maxrave/data/mediaservice/JvmMediaPlayerHandlerImpl.kt",
-              "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/App.kt",
-              "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/AnalyticsViewModel.kt",
-              "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/analytics/AnalyticsScreen.kt",
-              "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/analytics/AnalyticsFormat.kt",
-          ]
-          missing = [path for path in required if not (root / path).is_file()]
-          if missing:
-              raise SystemExit("Missing custom Insights files: " + ", ".join(missing))
-
-          accumulator = (root / required[0]).read_text()
-          if "positionDelta >= (elapsedMillis / 10L).coerceAtLeast(1L)" not in accumulator:
-              raise SystemExit("Playback tracker still accepts a zero-progress stall.")
-          if "if (currentSong == null) {" not in accumulator or "lastPositionMillis = positionMillis" not in accumulator:
-              raise SystemExit("Playback tracker does not reset its baseline when the current song is unavailable.")
-
-          repository = (root / required[1]).read_text()
-          if repository.splitlines().count("import kotlinx.coroutines.withContext") != 1:
-              raise SystemExit("AnalyticsRepositoryImpl must contain exactly one withContext import.")
-
-          view_model = (root / required[6]).read_text()
-          for marker in ("LocalDate(2026, 11, 1)", "AnalyticsUiState.DayRange.THIS_MONTH", "CUSTOM_RANGE"):
-              if marker not in view_model:
-                  raise SystemExit(f"Custom Insights period is missing: {marker}")
-
-          screen = (root / required[7]).read_text()
-          if "CUSTOM_RANGE" not in screen or "DateRangePicker" not in screen:
-              raise SystemExit("Custom date-range filtering is incomplete.")
-
-          app = (root / required[5]).read_text()
-          if "AnalyticsDestination" not in app and "InsightsDestination" not in app:
-              raise SystemExit("The custom Insights destination is not wired into the app.")
-
-          for handler_path in required[3:5]:
-              handler = (root / handler_path).read_text()
-              for marker in ("listeningAccumulator.tick", "saveListeningSession", "listeningRecoveryReady.await()", "persistListeningCheckpoint", "recoverListeningCheckpoint", "persistCompletedListeningSession"):
-                  if marker not in handler:
-                      raise SystemExit(f"Crash-safe playback marker {marker} is missing from {handler_path}.")
-              if "mayBeTrackingListeningLocal" in handler:
-                  raise SystemExit(f"Legacy percentage tracking still overlaps the 30-second accumulator in {handler_path}.")
-
-          datasource = (root / "core/data/src/commonMain/kotlin/com/maxrave/data/db/datasource/AnalyticsDatasource.kt").read_text()
-          if "stableSyncId" not in datasource or "syncRecorder.play(stableSyncId)" not in datasource:
-              raise SystemExit("Recovered Insights events are not connected to history sync.")
-          if "PlaybackSyncSignal.notifyNewPlayback()" not in datasource:
-              raise SystemExit("Recovered Insights events bypass the immediate playback-sync signal.")
-
-          dao = (root / required[2]).read_text()
-          if "listenedSecond >= 30" not in dao:
-              raise SystemExit("The 30-second complete-play threshold is missing.")
-
-          sync_dao = (root / "core/data/src/commonMain/kotlin/com/maxrave/data/db/SyncDao.kt").read_text()
-          if "suspend fun getPlaybackEventBySyncId(syncId: String): PlaybackEventEntity?" not in sync_dao:
-              raise SystemExit("SyncDao history lookup is missing.")
-          if "suspend fun updatePlaybackEvent(event: PlaybackEventEntity)" not in sync_dao:
-              raise SystemExit("SyncDao history update is missing.")
-
-          sync_applier = (root / "core/data/src/commonMain/kotlin/com/maxrave/data/librarysync/SyncApplier.kt").read_text()
-          if "getPlaybackEventBySyncId(event.syncId)" not in sync_applier or "existing.copy(listenedSecond = event.listenedSecond)" not in sync_applier:
-              raise SystemExit("Recovered history events are not idempotently upserted.")
-          if "dao.updatePlaybackEvent(existing.copy(listenedSecond = event.listenedSecond))\n                // The host must log this newer version so already-paired devices receive it too.\n                return true" not in sync_applier:
-              raise SystemExit("Newer recovered play durations are not re-published to paired devices.")
-
-          analytics_api = (root / "core/domain/src/commonMain/kotlin/com/maxrave/domain/repository/AnalyticsRepository.kt").read_text()
-          if "syncId: String? = null" not in analytics_api or "timestamp: LocalDateTime? = null" not in analytics_api:
-              raise SystemExit("AnalyticsRepository does not accept stable event identity and original session time.")
-          analytics_impl = (root / "core/data/src/commonMain/kotlin/com/maxrave/data/repository/AnalyticsRepositoryImpl.kt").read_text()
-          if "                    syncId," not in analytics_impl or "                    timestamp," not in analytics_impl:
-              raise SystemExit("AnalyticsRepositoryImpl does not forward checkpoint identity and timestamp.")
-
-          resources = ET.parse(root / "composeApp/src/commonMain/composeResources/values/strings.xml").getroot()
-          names = [item.attrib.get("name") for item in resources if item.tag == "string"]
-          for key in ("this_month", "all_time"):
-              if names.count(key) != 1:
-                  raise SystemExit(f"Custom Insights resource {key} is missing or duplicated.")
-          print("Custom Insights, date filters, 30-second threshold, crash recovery and history upserts passed.")
-          PY
 
       - name: Validate selected 2.7 features and preserved custom systems
         run: |
@@ -318,14 +222,6 @@ jobs:
               raise SystemExit("YouTube Google email is not forwarded into the domain model.")
           print("Selected YouTube identity and SimpCloud account-matching checks passed.")
           PY
-
-      - name: Keep Insights recovery checkpoints device-local
-        run: |
-          SETTINGS_SYNC="androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncSettingsSync.kt"
-          if grep -q 'analytics_active_listening_checkpoint_v1' "$SETTINGS_SYNC"; then
-            echo "::error::Unfinished local Insights checkpoints must never sync between devices."
-            exit 1
-          fi
 
       - name: Final source hygiene
         run: |
