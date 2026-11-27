@@ -108,8 +108,8 @@ jobs:
 
       - name: Enforce selected YouTube and SimpCloud account matching
         run: |
-          git apply --check SimpMusic-Cloud-Sync-V17-Account-Matching.patch
-          git apply SimpMusic-Cloud-Sync-V17-Account-Matching.patch
+          git apply --recount --check SimpMusic-Cloud-Sync-V17-Account-Matching.patch
+          git apply --recount SimpMusic-Cloud-Sync-V17-Account-Matching.patch
 
       - name: Apply SimpCloud V15 immediate manual sync
         run: |
