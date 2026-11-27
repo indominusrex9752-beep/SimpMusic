@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply the custom Insights archive to Cloud-Sync app sources and merge its core overlay into 2.7 core."""
+"""Apply the existing custom Insights archive without modifying its Analytics implementation."""
 from pathlib import Path, PurePosixPath
 import subprocess
 import tempfile
@@ -86,39 +86,5 @@ for target, data in app_files:
 for target, data in merged_core.items():
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(data)
-
-# Remove the duplicate import present in the original Insights archive.
-repository = Path("core/data/src/commonMain/kotlin/com/maxrave/data/repository/AnalyticsRepositoryImpl.kt")
-if repository.exists():
-    lines = repository.read_text().splitlines()
-    seen = set()
-    cleaned = []
-    for line in lines:
-        if line.startswith("import ") and line in seen:
-            continue
-        if line.startswith("import "):
-            seen.add(line)
-        cleaned.append(line)
-    repository.write_text("\n".join(cleaned) + "\n")
-
-# Exclude stalled-position intervals and reset the baseline when no current song is available.
-accumulator = Path("core/data/src/commonMain/kotlin/com/maxrave/data/mediaservice/PlaybackListeningAccumulator.kt")
-if accumulator.exists():
-    source = accumulator.read_text()
-    old = "if (elapsedMillis > 0L && positionDelta >= 0L && positionDelta <= plausibleMaximum) {"
-    new = "if (elapsedMillis > 0L && positionDelta >= (elapsedMillis / 10L).coerceAtLeast(1L) && positionDelta <= plausibleMaximum) {"
-    if old not in source:
-        raise SystemExit("Could not find the expected accumulator progress guard.")
-    source = source.replace(old, new, 1)
-    null_song_old = "        if (currentSong == null) return null"
-    null_song_new = """        if (currentSong == null) {
-            lastPositionMillis = positionMillis
-            lastTick = TimeSource.Monotonic.markNow()
-            return null
-        }"""
-    if null_song_old not in source:
-        raise SystemExit("Could not find the expected null-song guard.")
-    source = source.replace(null_song_old, null_song_new, 1)
-    accumulator.write_text(source)
 
 print(f"Applied {len(app_files)} custom Insights app files and merged {len(merged_core)} core files into the pinned 2.7 core.")
