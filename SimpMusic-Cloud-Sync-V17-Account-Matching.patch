@@ -16,7 +16,7 @@ diff --git a/androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncA
 +import org.koin.core.component.inject
  
  /**
-@@ -30,3 +33,6 @@
+@@ -30,3 +35,6 @@
   * No YouTube cookies, browser cookies, or Google passwords are sent to Supabase.
   */
 -class CloudSyncAuth {
