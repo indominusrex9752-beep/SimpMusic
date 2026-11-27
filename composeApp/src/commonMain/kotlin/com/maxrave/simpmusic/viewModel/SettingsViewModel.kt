@@ -1614,6 +1614,7 @@ class SettingsViewModel(
                     _googleAccounts.emit(LocalResource.Success(accounts))
                     refreshSelectedYouTubeGoogleEmail()
                 } else {
+                    _selectedYouTubeGoogleEmail.value = null
                     if (loggedIn.value == DataStoreManager.TRUE) {
                         accountRepository
                             .getAccountInfo(
