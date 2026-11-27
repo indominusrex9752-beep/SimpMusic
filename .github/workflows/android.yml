@@ -218,6 +218,8 @@ jobs:
               raise SystemExit("Durable, uniquely identified listening checkpoints are missing.")
           if "lastCheckpointMillis < 30_000L" not in checkpoint_source or "listenedMillis - lastCheckpointMillis < 2_000L" not in checkpoint_source:
               raise SystemExit("Checkpoint cadence or immediate 30-second threshold persistence is missing.")
+          if "List<ListeningSessionCheckpoint>" not in (root / "core/data/src/androidMain/kotlin/com/maxrave/data/mediaservice/MediaServiceHandlerImpl.kt").read_text():
+              raise SystemExit("The checkpoint store cannot retain multiple interrupted track sessions.")
           dao_checkpoint = (root / required[2]).read_text()
           if "getPlaybackEventBySyncId" not in dao_checkpoint or "updatePlaybackEvent(existing.copy(listenedSecond = listenedSecond))" not in dao_checkpoint:
               raise SystemExit("Recovered Insights events are not idempotent.")
