@@ -180,7 +180,7 @@ jobs:
               raise SystemExit("Custom date-range filtering is incomplete.")
 
           app = (root / required[5]).read_text()
-          if "InsightsDestination" not in app:
+          if "AnalyticsDestination" not in app and "InsightsDestination" not in app:
               raise SystemExit("The custom Insights destination is not wired into the app.")
 
           for handler_path in required[3:5]:
@@ -287,7 +287,7 @@ jobs:
               raise SystemExit("AI-provider settings were incorrectly added to cloud sync.")
 
           app = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/App.kt")
-          if "titleMarquee = titleMarquee" not in app or "InsightsDestination" not in app:
+          if "titleMarquee = titleMarquee" not in app or ("AnalyticsDestination" not in app and "InsightsDestination" not in app):
               raise SystemExit("The custom Insights app root or title-marquee preference is missing.")
 
           resources = read("composeApp/src/commonMain/composeResources/values/strings.xml")
