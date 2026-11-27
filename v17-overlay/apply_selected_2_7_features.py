@@ -476,12 +476,12 @@ def patch_shared_view_model(source: str) -> str:
     # requires title and artists so it can rank Spotify lyric matches against the track.
     legacy_spotify_call = "lyricsCanvasRepository.getSpotifyLyrics(dataStoreManager, query, duration)"
     upgraded_spotify_call = (
-        "lyricsCanvasRepository.getSpotifyLyrics(\\n"
-        "                    dataStoreManager,\\n"
-        "                    query,\\n"
-        "                    duration,\\n"
-        "                    track.title,\\n"
-        "                    track.artists?.map { it.name }.orEmpty(),\\n"
+        "lyricsCanvasRepository.getSpotifyLyrics(\n"
+        "                    dataStoreManager,\n"
+        "                    query,\n"
+        "                    duration,\n"
+        "                    track.title,\n"
+        "                    track.artists?.map { it.name }.orEmpty(),\n"
         "                )"
     )
     if legacy_spotify_call in source:
