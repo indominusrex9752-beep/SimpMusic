@@ -3304,7 +3304,7 @@ fun SettingScreen(
                                             val selectedGoogleEmail = selectedYouTubeGoogleEmail?.trim()?.takeIf { email -> email.isNotBlank() }
                                             Text(
                                                 text = selectedGoogleEmail?.let { email ->
-                                                    "SimpCloud Google identity: $email"
+                                                    "YouTube Google email: $email"
                                                 } ?: "SimpCloud matching unavailable: Google email for this YouTube account could not be verified. Sync remains disabled.",
                                                 style = typo().bodySmall,
                                                 color = if (selectedGoogleEmail == null) {
