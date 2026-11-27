@@ -264,6 +264,28 @@ jobs:
           test "$(git -C core rev-parse HEAD)" = "88c1cf256f57ca07d90993d5fc966e96a71ecedb"
           git -C core merge-base --is-ancestor 36db877b583bd262f70d716bb5db81366c9dd256 HEAD
 
+      - name: Align Android compile SDK with SimpMusic 2.7 dependencies
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("androidApp/build.gradle.kts")
+          source = path.read_text()
+          legacy = "    compileSdk = 37"
+          updated = """    compileSdk {
+              version = release(37) { minorApiLevel = 2 }
+          }"""
+          if updated in source:
+              print("Android compile SDK already targets API 37.2.")
+          elif source.count(legacy) == 1:
+              path.write_text(source.replace(legacy, updated, 1))
+              print("Updated Android compile SDK to API 37.2.")
+          else:
+              raise SystemExit("Could not safely identify the app compileSdk declaration.")
+          check = path.read_text()
+          if "version = release(37) { minorApiLevel = 2 }" not in check:
+              raise SystemExit("Android compile SDK 37.2 verification failed.")
+          PY
+
       - name: Generate library definitions
         run: ./gradlew exportLibraryDefinitions
 
