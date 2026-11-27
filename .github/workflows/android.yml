@@ -308,7 +308,11 @@ jobs:
               raise SystemExit("The selected YouTube account matching diagnostic is missing or mislabeled.")
 
           resources = root / "composeApp/src/commonMain/composeResources/values/strings.xml"
-          ET.parse(resources)
+          resource_root = ET.parse(resources).getroot()
+          resource_names = [item.attrib.get("name") for item in resource_root if item.tag == "string"]
+          for required_string in ("this_month", "all_time"):
+              if resource_names.count(required_string) != 1:
+                  raise SystemExit(f"Insights resource {required_string} is missing or duplicated.")
           print("Insights merge checks passed: files, 30-second threshold, stall guard, date filters, navigation and XML.")
           PY
 
