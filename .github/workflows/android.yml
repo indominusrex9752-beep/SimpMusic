@@ -311,6 +311,13 @@ jobs:
           printf 'SUPABASE_URL=%s\n' "$SUPABASE_URL" >> local.properties
           printf 'SUPABASE_PUBLISHABLE_KEY=%s\n' "$SUPABASE_PUBLISHABLE_KEY" >> local.properties
 
+      - name: Validate Supabase BuildKonfig wiring
+        run: |
+          grep -q '"supabaseUrl"' composeApp/build.gradle.kts
+          grep -q '"supabasePublishableKey"' composeApp/build.gradle.kts
+          grep -q 'properties.getProperty("SUPABASE_URL")' composeApp/build.gradle.kts
+          grep -q 'properties.getProperty("SUPABASE_PUBLISHABLE_KEY")' composeApp/build.gradle.kts
+
       - name: Apply SimpCloud Google OAuth foundation
         run: |
           git apply --check SimpMusic-Cloud-Sync-Auth-Stage1.patch
