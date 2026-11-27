@@ -68,6 +68,11 @@ jobs:
 
           merged = {}
           conflicts = []
+          insights_resource_entries = [
+              '    <string name="this_month">This month</string>',
+              '    <string name="all_time">All time</string>',
+          ]
+          insights_strings_path = "composeApp/src/commonMain/composeResources/values/strings.xml"
           with zipfile.ZipFile(archive) as patch, tempfile.TemporaryDirectory() as temp:
               temp = pathlib.Path(temp)
               for index, name in enumerate(patch.namelist()):
@@ -83,6 +88,16 @@ jobs:
                   base_commit = core_base if is_core else main_base
                   target = repo_dir / target_rel
                   overlay_data = patch.read(name)
+                  # Both upstream 2.7 and Stage-1 append strings at </resources>. Move
+                  # the two Insights-only entries out of the overlay before diff3 so
+                  # independent additions at EOF cannot become a false merge conflict.
+                  if name == insights_strings_path:
+                      resource_text = overlay_data.decode("utf-8")
+                      for entry in insights_resource_entries:
+                          if resource_text.count(entry) != 1:
+                              raise SystemExit(f"Expected exactly one Insights resource entry: {entry}")
+                          resource_text = resource_text.replace(entry + "\\n", "", 1)
+                      overlay_data = resource_text.encode("utf-8")
 
                   overlay_file = temp / f"overlay-{index}"
                   overlay_file.write_bytes(overlay_data)
@@ -122,6 +137,18 @@ jobs:
               for name, reason in conflicts:
                   print(f" - {name}: {reason}")
               sys.exit(1)
+
+          # Re-add Insights strings after the 2.7 merge, avoiding an EOF/EOF insertion conflict.
+          strings_target = pathlib.Path(insights_strings_path)
+          if strings_target in merged:
+              resource_text = merged[strings_target].decode("utf-8")
+              for entry in insights_resource_entries:
+                  resource_name = entry.split('"')[1]
+                  if f'name="{resource_name}"' not in resource_text:
+                      if resource_text.count("</resources>") != 1:
+                          raise SystemExit("Could not safely place the Insights resource strings.")
+                      resource_text = resource_text.replace("</resources>", entry + "\\n</resources>", 1)
+              merged[strings_target] = resource_text.encode("utf-8")
 
           for target, data in merged.items():
               target.parent.mkdir(parents=True, exist_ok=True)
