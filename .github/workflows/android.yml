@@ -350,9 +350,10 @@ jobs:
           git apply --check SimpMusic-Cloud-Sync-V17-Settings-Keys.patch
           git apply SimpMusic-Cloud-Sync-V17-Settings-Keys.patch
 
-      - name: Preserve complete YouTube playlist shuffle
+      - name: Preserve complete YouTube playlist shuffle without replacing 2.7 code
         run: |
-          cp v17-overlay/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/PlaylistViewModel.kt composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/PlaylistViewModel.kt
+          python3 -m py_compile v17-overlay/apply_shuffle_fix.py
+          python3 v17-overlay/apply_shuffle_fix.py
 
       - name: Keep Insights recovery checkpoints device-local
         run: |
