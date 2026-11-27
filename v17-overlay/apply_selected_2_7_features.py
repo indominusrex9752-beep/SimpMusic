@@ -253,45 +253,45 @@ edit(APP, patch_app)
 # SettingsViewModel or SharedViewModel: those files also contain unrelated AI and Analytics work.
 SETTINGS_VM = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SettingsViewModel.kt"
 def patch_settings_view_model(source: str) -> str:
-    state_anchor = "    private var _enableLiquidGlass: MutableStateFlow<Boolean> = MutableStateFlow(false)\\n    val enableLiquidGlass: StateFlow<Boolean> = _enableLiquidGlass\\n"
+    state_anchor = "    private var _enableLiquidGlass: MutableStateFlow<Boolean> = MutableStateFlow(false)\n    val enableLiquidGlass: StateFlow<Boolean> = _enableLiquidGlass\n"
     state_addition = (
-        "    private val _titleMarquee = MutableStateFlow(true)\\n"
-        "    val titleMarquee: StateFlow<Boolean> = _titleMarquee\\n"
-        "    private val _animatedLyricsBackground = MutableStateFlow(false)\\n"
-        "    val animatedLyricsBackground: StateFlow<Boolean> = _animatedLyricsBackground\\n"
-        "    private val _lyricsBackgroundPulse = MutableStateFlow(false)\\n"
-        "    val lyricsBackgroundPulse: StateFlow<Boolean> = _lyricsBackgroundPulse\\n"
+        "    private val _titleMarquee = MutableStateFlow(true)\n"
+        "    val titleMarquee: StateFlow<Boolean> = _titleMarquee\n"
+        "    private val _animatedLyricsBackground = MutableStateFlow(false)\n"
+        "    val animatedLyricsBackground: StateFlow<Boolean> = _animatedLyricsBackground\n"
+        "    private val _lyricsBackgroundPulse = MutableStateFlow(false)\n"
+        "    val lyricsBackgroundPulse: StateFlow<Boolean> = _lyricsBackgroundPulse\n"
     )
     if "_titleMarquee" not in source:
         source = replace_once(source, state_anchor, state_anchor + state_addition, "selected preference state")
 
-    init_anchor = "        getEnableLiquidGlass()\\n"
+    init_anchor = "        getEnableLiquidGlass()\n"
     init_addition = (
-        "        viewModelScope.launch { dataStoreManager.getString(\\"title_marquee\\").collect { _titleMarquee.value = it != DataStoreManager.FALSE } }\\n"
-        "        viewModelScope.launch { dataStoreManager.getString(\\"animated_lyrics_background\\").collect { _animatedLyricsBackground.value = it == DataStoreManager.TRUE } }\\n"
-        "        viewModelScope.launch { dataStoreManager.getString(\\"lyrics_background_pulse\\").collect { _lyricsBackgroundPulse.value = it == DataStoreManager.TRUE } }\\n"
+        "        viewModelScope.launch { dataStoreManager.getString(\"title_marquee\").collect { _titleMarquee.value = it != DataStoreManager.FALSE } }\n"
+        "        viewModelScope.launch { dataStoreManager.getString(\"animated_lyrics_background\").collect { _animatedLyricsBackground.value = it == DataStoreManager.TRUE } }\n"
+        "        viewModelScope.launch { dataStoreManager.getString(\"lyrics_background_pulse\").collect { _lyricsBackgroundPulse.value = it == DataStoreManager.TRUE } }\n"
     )
-    if "getString(\\"title_marquee\\")" not in source:
+    if "getString(\"title_marquee\")" not in source:
         source = replace_once(source, init_anchor, init_anchor + init_addition, "selected preference collectors")
 
     setter_anchor = (
-        "    fun setEnableLiquidGlass(enableLiquidGlass: Boolean) {\\n"
-        "        viewModelScope.launch {\\n"
-        "            dataStoreManager.setEnableLiquidGlass(enableLiquidGlass)\\n"
-        "            getEnableLiquidGlass()\\n"
-        "        }\\n"
-        "    }\\n"
+        "    fun setEnableLiquidGlass(enableLiquidGlass: Boolean) {\n"
+        "        viewModelScope.launch {\n"
+        "            dataStoreManager.setEnableLiquidGlass(enableLiquidGlass)\n"
+        "            getEnableLiquidGlass()\n"
+        "        }\n"
+        "    }\n"
     )
     setters = (
-        "\\n    fun setTitleMarquee(enabled: Boolean) {\\n"
-        "        viewModelScope.launch { dataStoreManager.putString(\\"title_marquee\\", if (enabled) DataStoreManager.TRUE else DataStoreManager.FALSE) }\\n"
-        "    }\\n"
-        "    fun setAnimatedLyricsBackground(enabled: Boolean) {\\n"
-        "        viewModelScope.launch { dataStoreManager.putString(\\"animated_lyrics_background\\", if (enabled) DataStoreManager.TRUE else DataStoreManager.FALSE) }\\n"
-        "    }\\n"
-        "    fun setLyricsBackgroundPulse(enabled: Boolean) {\\n"
-        "        viewModelScope.launch { dataStoreManager.putString(\\"lyrics_background_pulse\\", if (enabled) DataStoreManager.TRUE else DataStoreManager.FALSE) }\\n"
-        "    }\\n"
+        "\n    fun setTitleMarquee(enabled: Boolean) {\n"
+        "        viewModelScope.launch { dataStoreManager.putString(\"title_marquee\", if (enabled) DataStoreManager.TRUE else DataStoreManager.FALSE) }\n"
+        "    }\n"
+        "    fun setAnimatedLyricsBackground(enabled: Boolean) {\n"
+        "        viewModelScope.launch { dataStoreManager.putString(\"animated_lyrics_background\", if (enabled) DataStoreManager.TRUE else DataStoreManager.FALSE) }\n"
+        "    }\n"
+        "    fun setLyricsBackgroundPulse(enabled: Boolean) {\n"
+        "        viewModelScope.launch { dataStoreManager.putString(\"lyrics_background_pulse\", if (enabled) DataStoreManager.TRUE else DataStoreManager.FALSE) }\n"
+        "    }\n"
     )
     if "fun setTitleMarquee(" not in source:
         source = replace_once(source, setter_anchor, setter_anchor + setters, "selected preference setters")
@@ -300,8 +300,8 @@ edit(SETTINGS_VM, patch_settings_view_model)
 
 SHARED_VM = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SharedViewModel.kt"
 def patch_shared_view_model(source: str) -> str:
-    anchor = "    fun getEnableLiquidGlass() = dataStoreManager.enableLiquidGlass\\n"
-    addition = "    fun getTitleMarquee(): Flow<Boolean> = dataStoreManager.getString(\\"title_marquee\\").map { it != FALSE }\\n"
+    anchor = "    fun getEnableLiquidGlass() = dataStoreManager.enableLiquidGlass\n"
+    addition = "    fun getTitleMarquee(): Flow<Boolean> = dataStoreManager.getString(\"title_marquee\").map { it != FALSE }\n"
     if "fun getTitleMarquee()" not in source:
         source = replace_once(source, anchor, anchor + addition, "title marquee getter")
     return source
