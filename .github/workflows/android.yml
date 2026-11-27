@@ -44,6 +44,8 @@ jobs:
               return subprocess.run(args, check=True, **kwargs)
 
           run(["git", "fetch", "https://github.com/maxrave-dev/SimpMusic.git", main_base, main_head])
+          run(["git", "cat-file", "-e", f"{main_head}^{{commit}}"])
+          run(["git", "merge-base", "--is-ancestor", main_head, "HEAD"])
           core_base_line = run(
               ["git", "ls-tree", main_base, "core"],
               text=True, stdout=subprocess.PIPE
