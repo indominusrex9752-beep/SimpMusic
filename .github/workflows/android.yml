@@ -134,7 +134,7 @@ jobs:
           CORE_BASE="$(git ls-tree HEAD core | awk '{print $3}')"
           git -C core cat-file -e "$CORE_BASE^{commit}"
           git -C core merge-base --is-ancestor "$CORE_BASE" HEAD
-          test "$(git -C core rev-parse HEAD)" = "$(git -C core rev-parse Version-Upgrade)"
+          test "$(git -C core rev-parse HEAD)" = "88c1cf256f57ca07d90993d5fc966e96a71ecedb"
 
       - name: Generate library definitions
         run: ./gradlew exportLibraryDefinitions
