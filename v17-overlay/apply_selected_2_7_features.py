@@ -34,8 +34,6 @@ FEATURE_PATHS = [
     "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/FullscreenLyricsContent.kt",
     "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/LyricsFlowBackground.kt",
     "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/player/NowPlayingScreen.kt",
-    "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SharedViewModel.kt",
-    "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SettingsViewModel.kt",
     "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/theme/Theme.kt",
     "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/theme/Color.kt",
     "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/extension/UIExt.kt",
@@ -68,7 +66,7 @@ def edit(path: str, transform) -> None:
     target.write_text(updated)
 
 # Refuse to run against a different base or silently omit a selected feature.
-run(["git", "cat-file", "-e", f"{BASE}^{{commit}}"])
+if any("analytics" in path.lower() or "insights" in path.lower() for path in FEATURE_PATHS):\n    raise SystemExit("Analytics/Insights source files must never be imported from 2.7.")\nrun(["git", "cat-file", "-e", f"{BASE}^{{commit}}"])
 run(["git", "cat-file", "-e", f"{UPGRADE}^{{commit}}"])
 diff = run(
     ["git", "diff", "--binary", "--no-ext-diff", BASE, UPGRADE, "--", *FEATURE_PATHS],
@@ -250,6 +248,64 @@ def patch_app(source: str) -> str:
         source = replace_once(source, theme_anchor, theme_anchor + theme_line, "App title-marquee theme binding")
     return source
 edit(APP, patch_app)
+
+# Port only the three selected non-AI preferences. Do not copy the full 2.7
+# SettingsViewModel or SharedViewModel: those files also contain unrelated AI and Analytics work.
+SETTINGS_VM = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SettingsViewModel.kt"
+def patch_settings_view_model(source: str) -> str:
+    state_anchor = "    private var _enableLiquidGlass: MutableStateFlow<Boolean> = MutableStateFlow(false)\\n    val enableLiquidGlass: StateFlow<Boolean> = _enableLiquidGlass\\n"
+    state_addition = (
+        "    private val _titleMarquee = MutableStateFlow(true)\\n"
+        "    val titleMarquee: StateFlow<Boolean> = _titleMarquee\\n"
+        "    private val _animatedLyricsBackground = MutableStateFlow(false)\\n"
+        "    val animatedLyricsBackground: StateFlow<Boolean> = _animatedLyricsBackground\\n"
+        "    private val _lyricsBackgroundPulse = MutableStateFlow(false)\\n"
+        "    val lyricsBackgroundPulse: StateFlow<Boolean> = _lyricsBackgroundPulse\\n"
+    )
+    if "_titleMarquee" not in source:
+        source = replace_once(source, state_anchor, state_anchor + state_addition, "selected preference state")
+
+    init_anchor = "        getEnableLiquidGlass()\\n"
+    init_addition = (
+        "        viewModelScope.launch { dataStoreManager.getString(\\"title_marquee\\").collect { _titleMarquee.value = it != DataStoreManager.FALSE } }\\n"
+        "        viewModelScope.launch { dataStoreManager.getString(\\"animated_lyrics_background\\").collect { _animatedLyricsBackground.value = it == DataStoreManager.TRUE } }\\n"
+        "        viewModelScope.launch { dataStoreManager.getString(\\"lyrics_background_pulse\\").collect { _lyricsBackgroundPulse.value = it == DataStoreManager.TRUE } }\\n"
+    )
+    if "getString(\\"title_marquee\\")" not in source:
+        source = replace_once(source, init_anchor, init_anchor + init_addition, "selected preference collectors")
+
+    setter_anchor = (
+        "    fun setEnableLiquidGlass(enableLiquidGlass: Boolean) {\\n"
+        "        viewModelScope.launch {\\n"
+        "            dataStoreManager.setEnableLiquidGlass(enableLiquidGlass)\\n"
+        "            getEnableLiquidGlass()\\n"
+        "        }\\n"
+        "    }\\n"
+    )
+    setters = (
+        "\\n    fun setTitleMarquee(enabled: Boolean) {\\n"
+        "        viewModelScope.launch { dataStoreManager.putString(\\"title_marquee\\", if (enabled) DataStoreManager.TRUE else DataStoreManager.FALSE) }\\n"
+        "    }\\n"
+        "    fun setAnimatedLyricsBackground(enabled: Boolean) {\\n"
+        "        viewModelScope.launch { dataStoreManager.putString(\\"animated_lyrics_background\\", if (enabled) DataStoreManager.TRUE else DataStoreManager.FALSE) }\\n"
+        "    }\\n"
+        "    fun setLyricsBackgroundPulse(enabled: Boolean) {\\n"
+        "        viewModelScope.launch { dataStoreManager.putString(\\"lyrics_background_pulse\\", if (enabled) DataStoreManager.TRUE else DataStoreManager.FALSE) }\\n"
+        "    }\\n"
+    )
+    if "fun setTitleMarquee(" not in source:
+        source = replace_once(source, setter_anchor, setter_anchor + setters, "selected preference setters")
+    return source
+edit(SETTINGS_VM, patch_settings_view_model)
+
+SHARED_VM = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SharedViewModel.kt"
+def patch_shared_view_model(source: str) -> str:
+    anchor = "    fun getEnableLiquidGlass() = dataStoreManager.enableLiquidGlass\\n"
+    addition = "    fun getTitleMarquee(): Flow<Boolean> = dataStoreManager.getString(\\"title_marquee\\").map { it != FALSE }\\n"
+    if "fun getTitleMarquee()" not in source:
+        source = replace_once(source, anchor, anchor + addition, "title marquee getter")
+    return source
+edit(SHARED_VM, patch_shared_view_model)
 
 # Add only the non-AI V17 preference keys to the settings-sync allowlist.
 SYNC_SETTINGS = "androidApp/src/main/java/com/maxrave/simpmusic/cloudsync/CloudSyncSettingsSync.kt"
