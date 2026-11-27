@@ -3297,6 +3297,21 @@ fun SettingScreen(
                                     Column(Modifier.weight(1f)) {
                                         Text(it.name, style = typo().labelMedium, color = MaterialTheme.colorScheme.onBackground)
                                         Text(it.email, style = typo().bodySmall)
+                                        if (it.isUsed) {
+                                            val selectedGoogleEmail = it.googleEmail?.trim()?.takeIf { email -> email.isNotBlank() }
+                                            Text(
+                                                text = selectedGoogleEmail?.let { email ->
+                                                    "SimpCloud Google identity: $email"
+                                                } ?: "SimpCloud matching unavailable: YouTube did not provide this account's Google email. Sync remains disabled.",
+                                                style = typo().bodySmall,
+                                                color = if (selectedGoogleEmail == null) {
+                                                    MaterialTheme.colorScheme.error
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                                },
+                                                maxLines = 2,
+                                            )
+                                        }
                                     }
                                     Spacer(Modifier.width(12.dp))
                                     AnimatedVisibility(it.isUsed) {
