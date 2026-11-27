@@ -168,6 +168,7 @@ jobs:
         run: |
           git -C core apply --check ../SimpMusic-Cloud-Sync-V17-History-Upsert.patch
           git -C core apply ../SimpMusic-Cloud-Sync-V17-History-Upsert.patch
+          git -C core diff --check
 
       - name: Validate merged Insights implementation
         run: |
