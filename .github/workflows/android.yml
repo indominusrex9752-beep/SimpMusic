@@ -160,7 +160,9 @@ jobs:
           PY
 
       - name: Apply crash-safe Insights checkpoints
-        run: python3 v17-overlay/apply_crash_safe_insights.py
+        run: |
+          python3 -m py_compile v17-overlay/apply_crash_safe_insights.py
+          python3 v17-overlay/apply_crash_safe_insights.py
 
       - name: Validate merged Insights implementation
         run: |
