@@ -100,6 +100,6 @@ if repository.exists():
         if line.startswith("import "):
             seen.add(line)
         cleaned.append(line)
-    repository.write_text("\\n".join(cleaned) + "\\n")
+    repository.write_text("\n".join(cleaned) + "\n")
 
 print(f"Applied {len(app_files)} custom Insights app files and merged {len(merged_core)} core files into the pinned 2.7 core.")
