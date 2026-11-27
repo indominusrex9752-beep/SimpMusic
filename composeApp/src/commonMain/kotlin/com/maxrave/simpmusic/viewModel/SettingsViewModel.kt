@@ -1575,6 +1575,34 @@ class SettingsViewModel(
         MutableStateFlow(LocalResource.Loading())
     val googleAccounts: StateFlow<LocalResource<List<GoogleAccountEntity>>> = _googleAccounts
 
+    private val _selectedYouTubeGoogleEmail = MutableStateFlow<String?>(null)
+    val selectedYouTubeGoogleEmail: StateFlow<String?> = _selectedYouTubeGoogleEmail
+
+    private fun refreshSelectedYouTubeGoogleEmail() {
+        viewModelScope.launch {
+            val email = try {
+                val cookie = dataStoreManager.cookie.first()
+                val pageId = dataStoreManager.pageId.first()
+                val authUser = dataStoreManager.authUser.first()
+                if (cookie.isBlank() || pageId.isBlank()) {
+                    null
+                } else {
+                    accountRepository
+                        .getAccountInfo(cookie)
+                        .firstOrNull()
+                        ?.firstOrNull { it.pageId == pageId && it.authUser == authUser }
+                        ?.googleEmail
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Logger.w("SettingsViewModel", "Could not refresh selected YouTube Google identity: ${e.message}")
+                null
+            }
+            _selectedYouTubeGoogleEmail.value = email?.trim()?.takeIf { it.contains("@") }
+        }
+    }
+
     fun getAllGoogleAccount() {
         Logger.d("getAllGoogleAccount", "getAllGoogleAccount: Go to function")
         viewModelScope.launch {
@@ -1584,6 +1612,7 @@ class SettingsViewModel(
                 Logger.d("getAllGoogleAccount", "getAllGoogleAccount: ${accounts?.size ?: 0} saved account(s)")
                 if (!accounts.isNullOrEmpty()) {
                     _googleAccounts.emit(LocalResource.Success(accounts))
+                    refreshSelectedYouTubeGoogleEmail()
                 } else {
                     if (loggedIn.value == DataStoreManager.TRUE) {
                         accountRepository
