@@ -221,7 +221,7 @@ jobs:
           if "List<ListeningSessionCheckpoint>" not in (root / "core/data/src/androidMain/kotlin/com/maxrave/data/mediaservice/MediaServiceHandlerImpl.kt").read_text():
               raise SystemExit("The checkpoint store cannot retain multiple interrupted track sessions.")
           dao_checkpoint = (root / required[2]).read_text()
-          if "getPlaybackEventBySyncId" not in dao_checkpoint or "updatePlaybackEvent(existing.copy(listenedSecond = listenedSecond))" not in dao_checkpoint:
+          if "getPlaybackEventBySyncId" not in dao_checkpoint or "updatePlaybackEvent(existing.copy(listenedSecond = maxOf(existing.listenedSecond, listenedSecond)))" not in dao_checkpoint:
               raise SystemExit("Recovered Insights events are not idempotent.")
           datasource = (root / "core/data/src/commonMain/kotlin/com/maxrave/data/db/datasource/AnalyticsDatasource.kt").read_text()
           if "stableSyncId" not in datasource or "syncRecorder.play(stableSyncId)" not in datasource:
