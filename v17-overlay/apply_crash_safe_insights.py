@@ -292,6 +292,23 @@ def dao(source):
     return source[:matches[0].start()] + method + source[matches[0].end():]
 edit("core/data/src/commonMain/kotlin/DatabaseDao.kt", dao)
 
+def sync_applier(source):
+    return replace_once(source,
+        """        if (dao.eventCount(event.syncId) > 0) return false
+        dao.insertEventWithArtists(""",
+        """        val existing = dao.getPlaybackEventBySyncId(event.syncId)
+        if (existing != null) {
+            // A retry may carry a newer final duration for the same play. Update the existing
+            // event without creating a second history entry on this device.
+            if (event.listenedSecond > existing.listenedSecond) {
+                dao.updatePlaybackEvent(existing.copy(listenedSecond = event.listenedSecond))
+            }
+            return false
+        }
+        dao.insertEventWithArtists(""",
+        "SyncApplier history event upsert")
+edit("core/data/src/commonMain/kotlin/com/maxrave/data/librarysync/SyncApplier.kt", sync_applier)
+
 def handler(source, platform):
     if "import kotlinx.coroutines.CompletableDeferred" not in source:
         source = replace_once(source,
