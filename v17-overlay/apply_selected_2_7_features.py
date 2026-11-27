@@ -267,12 +267,12 @@ edit(APP, patch_app)
 SETTINGS_VM = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SettingsViewModel.kt"
 def patch_settings_view_model(source: str) -> str:
     constants = (
-        'const val TITLE_MARQUEE_KEY = "title_marquee"\\n'
-        'const val ANIMATED_LYRICS_BACKGROUND_KEY = "animated_lyrics_background"\\n'
-        'const val LYRICS_BACKGROUND_PULSE_KEY = "lyrics_background_pulse"\\n\\n'
+        'const val TITLE_MARQUEE_KEY = "title_marquee"\n'
+        'const val ANIMATED_LYRICS_BACKGROUND_KEY = "animated_lyrics_background"\n'
+        'const val LYRICS_BACKGROUND_PULSE_KEY = "lyrics_background_pulse"\n\n'
     )
     if "const val ANIMATED_LYRICS_BACKGROUND_KEY" not in source:
-        source = replace_once(source, "class SettingsViewModel(\\n", constants + "class SettingsViewModel(\\n", "selected preference keys")
+        source = replace_once(source, "class SettingsViewModel(\n", constants + "class SettingsViewModel(\n", "selected preference keys")
 
     state_anchor = "    private var _enableLiquidGlass: MutableStateFlow<Boolean> = MutableStateFlow(false)\n    val enableLiquidGlass: StateFlow<Boolean> = _enableLiquidGlass\n"
     state_addition = (
