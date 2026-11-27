@@ -1,0 +1,46 @@
+diff --git a/androidApp/src/main/AndroidManifest.xml b/androidApp/src/main/AndroidManifest.xml
+--- a/androidApp/src/main/AndroidManifest.xml
++++ b/androidApp/src/main/AndroidManifest.xml
+@@ -1,4 +1,19 @@
+         </activity-alias>
+ 
++        <activity
++            android:name=".cloudsync.CloudSyncActivity"
++            android:exported="true"
++            android:launchMode="singleTop"
++            android:theme="@style/Theme.SimpMusic">
++            <intent-filter>
++                <action android:name="android.intent.action.VIEW" />
++                <category android:name="android.intent.category.DEFAULT" />
++                <category android:name="android.intent.category.BROWSABLE" />
++                <data android:host="auth-callback" android:scheme="simpmusic" />
++            </intent-filter>
++        </activity>
++
+         <provider
+             android:name="androidx.startup.InitializationProvider"
+diff --git a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt
+--- a/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt
++++ b/composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt
+@@ -1,5 +1,6 @@
+ import com.maxrave.simpmusic.Platform
++import com.maxrave.simpmusic.expect.openCloudSyncSettings
+ import com.maxrave.simpmusic.expect.AppIconStyle
+ import com.maxrave.simpmusic.expect.currentAppIcon
+ import com.maxrave.simpmusic.expect.setAppIcon
+@@ -1,10 +1,15 @@
+                     SettingItem(
+                         title = stringResource(Res.string.youtube_account),
+                         subtitle = stringResource(Res.string.manage_your_youtube_accounts),
+                         onClick = {
+                             viewModel.getAllGoogleAccount()
+                             showYouTubeAccountDialog = true
+                         },
+                     )
++                    SettingItem(
++                        title = "SimpCloud Sync",
++                        subtitle = "Connect your Google account for SimpCloud Sync",
++                        onClick = { openCloudSyncSettings() },
++                    )
+                     SettingItem(
+                         title = stringResource(Res.string.language),
