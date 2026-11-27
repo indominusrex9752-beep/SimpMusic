@@ -17,7 +17,7 @@ if "import kotlinx.coroutines.CancellationException\n" not in source:
     source = source.replace(import_anchor, "import kotlinx.coroutines.CancellationException\n" + import_anchor, 1)
 
 event_anchor = "            PlaylistUIEvent.Shuffle -> {\n"
-shuffle_anchor = "                val playlistId = data.id.removePrefix(\\"VL\\")\\n"
+shuffle_anchor = '                val playlistId = data.id.removePrefix("VL")\n'
 if source.count(event_anchor) != 1 or source.count(shuffle_anchor) != 1:
     raise SystemExit("The official 2.7 shuffle block has changed; refusing an unsafe insertion.")
 
