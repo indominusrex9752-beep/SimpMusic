@@ -277,7 +277,7 @@ def patch_settings_view_model(source: str) -> str:
     state_anchor = "    private var _enableLiquidGlass: MutableStateFlow<Boolean> = MutableStateFlow(false)\n    val enableLiquidGlass: StateFlow<Boolean> = _enableLiquidGlass\n"
 
     # Keep the selected YouTube identity lookup, but do not import the full 2.7 SettingsViewModel.
-    account_anchor = "    val googleAccounts: StateFlow<LocalResource<List<GoogleAccountEntity>>> = _googleAccounts\\n"
+    account_anchor = "    val googleAccounts: StateFlow<LocalResource<List<GoogleAccountEntity>>> = _googleAccounts\n"
     account_addition = """    private val _selectedYouTubeGoogleEmail = MutableStateFlow<String?>(null)
     val selectedYouTubeGoogleEmail: StateFlow<String?> = _selectedYouTubeGoogleEmail
     private var selectedYouTubeIdentityJob: Job? = null
@@ -323,7 +323,7 @@ def patch_settings_view_model(source: str) -> str:
                 } else {
                     _selectedYouTubeGoogleEmail.value = null
 """
-    if "refreshSelectedYouTubeGoogleEmail()" not in source:
+    if "                    refreshSelectedYouTubeGoogleEmail()\n" not in source:
         source = replace_once(source, account_success, account_success_new, "refresh selected YouTube identity with account list")
     state_addition = (
         "    private val _titleMarquee = MutableStateFlow(true)\n"
