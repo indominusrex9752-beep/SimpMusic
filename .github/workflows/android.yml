@@ -166,8 +166,8 @@ jobs:
 
       - name: Add idempotent synced playback history DAO operations
         run: |
-          git apply --check SimpMusic-Cloud-Sync-V17-History-Upsert.patch
-          git apply SimpMusic-Cloud-Sync-V17-History-Upsert.patch
+          git -C core apply --check ../SimpMusic-Cloud-Sync-V17-History-Upsert.patch
+          git -C core apply ../SimpMusic-Cloud-Sync-V17-History-Upsert.patch
 
       - name: Validate merged Insights implementation
         run: |
