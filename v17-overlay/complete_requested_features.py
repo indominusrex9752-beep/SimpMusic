@@ -227,7 +227,7 @@ elif 'subtitle = stringResource(Res.string.animated_lyrics_background_descriptio
     raise SystemExit("Could not safely move the animated lyrics option outside the Android 12 gate.")
 animated_row = settings.index("title = stringResource(Res.string.animated_lyrics_background)")
 lyrics_gate = settings.rfind("if (isLyricsBlurSupported())", 0, animated_row)
-if lyrics_gate >= 0:
+if lyrics_gate >= 0 and "\\n                        }\\n" not in settings[lyrics_gate:animated_row]:
     raise SystemExit("Animated lyrics preference is still nested inside the Android 12-only section.")
 (ROOT / settings_path).write_text(settings)
 
