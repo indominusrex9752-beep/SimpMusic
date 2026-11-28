@@ -1,5 +1,4 @@
 name: SimpMusic Debug APK V18 (Ultimate SimpMusic 2.7)
-
 on:
   workflow_dispatch:
   push:
