@@ -888,9 +888,7 @@ analytics_screen_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/
 analytics_screen = (ROOT / analytics_screen_path).read_text()
 for imp in (
     "import androidx.compose.material3.DatePickerDialog\n",
-    "import androidx.compose.material3.DateRangePicker\n",
     "import androidx.compose.material3.TextButton\n",
-    "import androidx.compose.material3.rememberDateRangePickerState\n",
     "import kotlin.time.Instant\n",
     "import kotlinx.datetime.LocalDate\n",
     "import kotlinx.datetime.TimeZone\n",
@@ -1080,7 +1078,7 @@ format_addition = """        AnalyticsUiState.DayRange.THIS_MONTH -> Res.string.
 """
 if "AnalyticsUiState.DayRange.SPECIFIC_DAY -> Res.string.specific_day" not in analytics_format:
     analytics_format = replace_once(analytics_format, format_anchor, format_anchor + format_addition, "V18 AnalyticsFormat exhaustive labels")
-format_import_anchor = "import simpmusic.composeapp.generated.resources.this_year\\n"
+format_import_anchor = "import simpmusic.composeapp.generated.resources.this_year\n"
 format_imports = """import simpmusic.composeapp.generated.resources.this_month
 import simpmusic.composeapp.generated.resources.all_time
 import simpmusic.composeapp.generated.resources.custom_range
@@ -1318,8 +1316,7 @@ analytics_screen_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/
 analytics_screen = (ROOT / analytics_screen_path).read_text()
 for anchor, addition, label in (
     ("import androidx.compose.material3.DatePickerDialog\n", "import androidx.compose.material3.AlertDialog\n", "V18 selector AlertDialog import"),
-    ("import androidx.compose.material3.DateRangePicker\n", "import androidx.compose.material3.DatePicker\n", "V18 single-date picker import"),
-    ("import androidx.compose.material3.rememberDateRangePickerState\n", "import androidx.compose.material3.rememberDatePickerState\n", "V18 single-date picker state import"),
+    ("import androidx.compose.material3.TextButton\n", "import androidx.compose.material3.AlertDialog\n", "V18 selector TextButton import"),
     ("import androidx.compose.runtime.mutableStateOf\n", "import androidx.compose.runtime.mutableIntStateOf\n", "V18 month/year selector state import"),
     ("import simpmusic.composeapp.generated.resources.custom_range\n", "import simpmusic.composeapp.generated.resources.specific_day\nimport simpmusic.composeapp.generated.resources.specific_month\nimport simpmusic.composeapp.generated.resources.specific_year\n", "V18 specific period label imports"),
 ):
@@ -1350,7 +1347,9 @@ analytics_screen = replace_once(
     var selectedYear by rememberSaveable { mutableIntStateOf(today.year) }
     var monthMenuExpanded by remember { mutableStateOf(false) }
     var yearMenuExpanded by remember { mutableStateOf(false) }
-    val singleDatePickerState = rememberDatePickerState()
+    val monthNamesForV18 = listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+    var selectedDay by rememberSaveable { mutableIntStateOf(today.day) }
+    var dayMenuExpanded by remember { mutableStateOf(false) }
 """,
     "V18 specific period picker state",
 )
@@ -1405,24 +1404,47 @@ analytics_screen = replace_once(
 )
 
 dialogs = """    if (showSpecificDay) {
-        DatePickerDialog(
+        AlertDialog(
             onDismissRequest = { showSpecificDay = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        singleDatePickerState.selectedDateMillis?.let { millis ->
-                            val selected = Instant.fromEpochMilliseconds(millis)
-                                .toLocalDateTime(TimeZone.UTC).date
-                            onSpecificDate(AnalyticsUiState.DayRange.SPECIFIC_DAY, selected)
-                            showSpecificDay = false
+            title = { Text("Select day") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box {
+                        TextButton(onClick = { dayMenuExpanded = true }) { Text(selectedDay.toString()) }
+                        DropdownMenu(expanded = dayMenuExpanded, onDismissRequest = { dayMenuExpanded = false }) {
+                            (1..31).forEach { day ->
+                                DropdownMenuItem(text = { Text(day.toString()) }, onClick = { selectedDay = day; dayMenuExpanded = false })
+                            }
                         }
-                    },
-                ) { Text("Apply") }
+                    }
+                    Box {
+                        TextButton(onClick = { monthMenuExpanded = true }) { Text(monthNamesForV18[selectedMonth - 1]) }
+                        DropdownMenu(expanded = monthMenuExpanded, onDismissRequest = { monthMenuExpanded = false }) {
+                            monthNamesForV18.forEachIndexed { index, name ->
+                                DropdownMenuItem(text = { Text(name) }, onClick = { selectedMonth = index + 1; monthMenuExpanded = false })
+                            }
+                        }
+                    }
+                    Box {
+                        TextButton(onClick = { yearMenuExpanded = true }) { Text(selectedYear.toString()) }
+                        DropdownMenu(expanded = yearMenuExpanded, onDismissRequest = { yearMenuExpanded = false }) {
+                            (2026..today.year).toList().asReversed().forEach { year ->
+                                DropdownMenuItem(text = { Text(year.toString()) }, onClick = { selectedYear = year; yearMenuExpanded = false })
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    runCatching { LocalDate(selectedYear, selectedMonth, selectedDay) }.getOrNull()?.let { selected ->
+                        onSpecificDate(AnalyticsUiState.DayRange.SPECIFIC_DAY, selected)
+                        showSpecificDay = false
+                    }
+                }) { Text("Apply") }
             },
             dismissButton = { TextButton(onClick = { showSpecificDay = false }) { Text("Cancel") } },
-        ) {
-            DatePicker(state = singleDatePickerState)
-        }
+        )
     }
 
     if (showSpecificPeriod) {
