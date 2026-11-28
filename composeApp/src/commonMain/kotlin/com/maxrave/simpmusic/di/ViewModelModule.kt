@@ -180,7 +180,6 @@ val viewModelModule =
             RadioBuilderViewModel(
                 get(),
                 get(),
-                get(),
             )
         }
         viewModel {
