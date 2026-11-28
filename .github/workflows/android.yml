@@ -1,4 +1,4 @@
-name: SimpMusic Debug APK V17 (Version Upgrade 2.7)
+name: SimpMusic Debug APK V17 (Version Upgrade)
 
 on:
   workflow_dispatch:
