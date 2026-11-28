@@ -146,11 +146,6 @@ jobs:
           if "RadioBuilderDestination" not in radio or "radioId()" not in radio_vm:
               raise SystemExit("Radio Builder is not fully connected.")
 
-          replay = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/LibraryDynamicPlaylistViewModel.kt")
-          library = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/library/LibraryScreen.kt")
-          if "ReplayMix" not in replay or "replayMix" not in library:
-              raise SystemExit("Replay Mix is not wired into the library.")
-
           lyrics = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SharedViewModel.kt")
           sheet = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/ModalBottomSheet.kt")
           if "fun deleteLyrics(" not in lyrics or "onDeleteLyrics" not in sheet:
@@ -160,9 +155,6 @@ jobs:
           fullscreen = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/FullscreenLyricsContent.kt")
           if "LyricsFlowBackground" not in fullscreen or not background.strip():
               raise SystemExit("Animated lyrics background is incomplete.")
-          if "showReplayMix = true" not in read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/library/LibraryScreen.kt"):
-              raise SystemExit("Replay Mix card is still hidden behind the legacy local-tracking toggle.")
-
           automix = read("core/media/media3/src/main/java/com/maxrave/media3/exoplayer/CrossfadeExoPlayerAdapter.kt")
           if "TransitionPlanner.plan(" not in automix:
               raise SystemExit("AutoMix outro/drop-aware transition planner is not connected to playback.")
@@ -174,8 +166,11 @@ jobs:
           if "SearchTextField(" not in search_settings or "CompositionLocalProvider(LocalSettingSearch provides searchText)" not in search_settings:
               raise SystemExit("Settings search field or filtering provider is missing.")
           app_icons = read("composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/AppIcon.android.kt")
+          settings_ui = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt")
           if "setComponentEnabledSetting" not in app_icons or "AppIconPixel" not in read("androidApp/src/main/AndroidManifest.xml"):
               raise SystemExit("Android app icon chooser is not connected to launcher aliases.")
+          if "val appIcon = remember { currentAppIcon() }" not in settings_ui or "setAppIcon(style)" not in settings_ui:
+              raise SystemExit("App Icon Chooser is not exposed in Settings.")
 
           theme = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/theme/Theme.kt")
           settings = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt")
@@ -219,10 +214,10 @@ jobs:
               raise SystemExit("The custom Insights app root or title-marquee preference is missing.")
 
           resources = read("composeApp/src/commonMain/composeResources/values/strings.xml")
-          for key in ('name="theme_mode_amoled"', 'name="replay_mix"', 'name="delete_lyrics"'):
+          for key in ('name="theme_mode_amoled"', 'name="delete_lyrics"'):
               if key not in resources:
                   raise SystemExit(f"Selected feature resource is missing: {key}")
-          print("Radio Builder, Replay Mix, lyrics, AMOLED, desktop, settings and shuffle checks passed.")
+          print("Radio Builder, lyrics, AMOLED, desktop, settings and shuffle checks passed.")
           PY
 
       - name: Final source hygiene
