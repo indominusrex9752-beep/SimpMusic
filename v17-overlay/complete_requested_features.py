@@ -803,18 +803,33 @@ custom_method = """    fun setCustomRange(
     }
 
 """
-analytics_vm = replace_once(
-    analytics_vm,
-    "    fun setDayRange(dayRange: AnalyticsUiState.DayRange) {\n",
-    custom_method + "    fun setDayRange(dayRange: AnalyticsUiState.DayRange) {\n",
-    "V18 custom date-range setter",
-)
-analytics_vm = replace_once(
-    analytics_vm,
-    "    val periodEnd: LocalDate? = null,\n",
-    "    val periodEnd: LocalDate? = null,\n    val customStartDate: LocalDate? = null,\n    val customEndDate: LocalDate? = null,\n",
-    "V18 custom date-range state",
-)
+if "fun setCustomRange(" not in analytics_vm:
+    analytics_vm = replace_once(
+        analytics_vm,
+        "    fun setDayRange(dayRange: AnalyticsUiState.DayRange) {\\n",
+        custom_method + "    fun setDayRange(dayRange: AnalyticsUiState.DayRange) {\\n",
+        "V18 custom date-range setter",
+    )
+
+# The V17 custom Insights model may already declare these fields. Keep one declaration
+# for each field and insert only the missing ones.
+for field in ("customStartDate", "customEndDate"):
+    declaration = f"    val {field}: LocalDate? = null,"
+    lines = analytics_vm.splitlines()
+    matches = [i for i, line in enumerate(lines) if line.strip() == declaration.strip()]
+    if not matches:
+        analytics_vm = replace_once(
+            analytics_vm,
+            "    val periodEnd: LocalDate? = null,\\n",
+            "    val periodEnd: LocalDate? = null,\\n" + declaration + "\\n",
+            f"V18 custom date-range state: {field}",
+        )
+    elif len(matches) > 1:
+        keep = matches[0]
+        analytics_vm = "\\n".join(
+            line for i, line in enumerate(lines)
+            if line.strip() != declaration.strip() or i == keep
+        ) + "\\n"
 # The Insights archive and official 2.7 source use different comments/spacing here.
 # Extend the actual enum structurally, adding only missing values.
 day_range_enum = re.compile(
