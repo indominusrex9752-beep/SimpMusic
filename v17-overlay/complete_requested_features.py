@@ -1313,6 +1313,14 @@ analytics_screen = replace_once(
 """,
     "V18 specific filter menu labels",
 )
+for marker in (
+    "AnalyticsUiState.DayRange.SPECIFIC_DAY -> Res.string.specific_day",
+    "AnalyticsUiState.DayRange.SPECIFIC_MONTH -> Res.string.specific_month",
+    "AnalyticsUiState.DayRange.SPECIFIC_YEAR -> Res.string.specific_year",
+):
+    if analytics_screen.count(marker) != 2:
+        raise SystemExit(f"V18 Insights range labels must appear once in the pill and once in its menu: {marker}")
+
 analytics_screen = replace_once(
     analytics_screen,
     """                        if (range == AnalyticsUiState.DayRange.CUSTOM_RANGE) {
