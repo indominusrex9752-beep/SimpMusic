@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - Ultimate-Refinement 
+      - Ultimate-Refinement
 
 jobs:
   build:
@@ -22,12 +22,13 @@ jobs:
         run: |
           git fetch origin \
             '+refs/heads/Cloud-Sync:refs/remotes/origin/Cloud-Sync' \
-            '+refs/heads/Version-Upgrade:refs/remotes/origin/Version-Upgrade'
+            '+refs/heads/Version-Upgrade:refs/remotes/origin/Version-Upgrade' \
+            '+refs/heads/Ultimate-Refinement:refs/remotes/origin/Ultimate-Refinement'
           mkdir -p v17-overlay
-          git show origin/Version-Upgrade:v17-overlay/merge_custom_insights.py > v17-overlay/merge_custom_insights.py
-          git show origin/Version-Upgrade:v17-overlay/apply_selected_2_7_features.py > v17-overlay/apply_selected_2_7_features.py
-          git show origin/Version-Upgrade:v17-overlay/complete_requested_features.py > v17-overlay/complete_requested_features.py
-          git show origin/Version-Upgrade:SimpMusic-Cloud-Sync-V17-History-Upsert.patch > SimpMusic-Cloud-Sync-V17-History-Upsert.patch
+          git show origin/Ultimate-Refinement:v17-overlay/merge_custom_insights.py > v17-overlay/merge_custom_insights.py
+          git show origin/Ultimate-Refinement:v17-overlay/apply_selected_2_7_features.py > v17-overlay/apply_selected_2_7_features.py
+          git show origin/Ultimate-Refinement:v17-overlay/complete_requested_features.py > v17-overlay/complete_requested_features.py
+          git show origin/Ultimate-Refinement:SimpMusic-Cloud-Sync-V17-History-Upsert.patch > SimpMusic-Cloud-Sync-V17-History-Upsert.patch
 
       - name: Pin the 2.7-compatible SimpCloud core
         run: |
@@ -287,7 +288,7 @@ jobs:
       - name: Upload ARM64 APK
         uses: actions/upload-artifact@v4
         with:
-          name: SimpMusic-Version-Upgrade-V17-Debug
+          name: SimpMusic-Ultimate-Refinement-V18-Debug
           path: androidApp/build/outputs/apk/debug/*arm64-v8a*.apk
           if-no-files-found: error
           compression-level: 0
