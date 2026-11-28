@@ -159,7 +159,7 @@ if "CompositionLocalProvider(LocalSettingSearch provides searchText)" not in set
     settings = replace_once(settings, list_anchor, "    CompositionLocalProvider(LocalSettingSearch provides searchText) {\n" + list_anchor, "Settings search provider")
     close_anchor = "    // The pinned copy of the toolbar, frosted:"
     settings = replace_once(settings, close_anchor, "    }\n\n" + close_anchor, "Settings search provider closing")
-search_anchor = "                // Above every section, and inside item 0 rather than an item of its own, for the glow reason above.\n"
+search_anchor = "                SettingGroup(\n                    title = stringResource(Res.string.login_sync_section),\n"
 search_ui = (
     "                SearchTextField(\n"
     "                    query = searchQuery,\n"
