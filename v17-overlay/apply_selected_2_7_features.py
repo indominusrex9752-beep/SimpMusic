@@ -138,6 +138,66 @@ def expose_radio_builder(source: str) -> str:
     return source
 edit(LIBRARY_SCREEN, expose_radio_builder)
 
+
+# Replay Mix is explicitly excluded from V17. The selected 2.7 library diff can contain
+# references to its optional local-tracking strings, so strip only those UI/type branches.
+def strip_replay_mix():
+    tiling_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/LibraryTilingBox.kt"
+    tiling = (ROOT / tiling_path).read_text()
+    for line in (
+        "import simpmusic.composeapp.generated.resources.replay_mix\\n",
+        "import simpmusic.composeapp.generated.resources.replay_mix_subtitle\\n",
+    ):
+        tiling = tiling.replace(line, "")
+    tiling = re.sub(
+        r"        if \\(showReplayMix\\) \\{\\n            WideCard\\(\\n                title = Res\\.string\\.replay_mix,.*?\\n            \\) \\{ open\\(LibraryDynamicPlaylistType\\.ReplayMix\\) \\}\\n        \\}\\n",
+        "",
+        tiling,
+        flags=re.DOTALL,
+    )
+    (ROOT / tiling_path).write_text(tiling)
+
+    dynamic_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/library/LibraryDynamicPlaylistScreen.kt"
+    dynamic = (ROOT / dynamic_path).read_text()
+    for line in (
+        "import simpmusic.composeapp.generated.resources.replay_mix\\n",
+        "import simpmusic.composeapp.generated.resources.replay_mix_subtitle\\n",
+        "    val replayMix by viewModel.listReplayMixSong.collectAsStateWithLifecycle()\\n",
+        "    var tempReplayMix by remember { mutableStateOf(emptyList<SongEntity>()) }\\n",
+        "        tempReplayMix = replayMix.filter { it.matches(query) }\\n",
+        "                    stringResource(Res.string.replay_mix_subtitle)\\n",
+        "            ReplayMix -> Res.string.replay_mix\\n",
+        "            ReplayMix -> \\"replay_mix\\"\\n",
+        "                \\"replay_mix\\" -> ReplayMix\\n",
+    ):
+        dynamic = dynamic.replace(line, "")
+    dynamic = re.sub(
+        r"        // Read on every visit too: the mix changes once a day\\.\\n        if \\(parsed == LibraryDynamicPlaylistType\\.ReplayMix\\) \\{\\n            viewModel\\.getReplayMixSong\\(\\)\\n        \\}\\n",
+        "",
+        dynamic,
+    )
+    dynamic = re.sub(
+        r"                    LibraryDynamicPlaylistType\\.ReplayMix -> \\{\\n                        if \\(query\\.isNotEmpty\\(\\) && showSearchBar\\) \\{\\n                            tempReplayMix\\n                        \\} else \\{\\n                            replayMix\\n                        \\}\\n                    \\}\\n",
+        "",
+        dynamic,
+    )
+    dynamic = re.sub(
+        r"                                LibraryDynamicPlaylistType\\.ReplayMix ->\\n                                    \\(if \\(query\\.isNotEmpty\\(\\) && showSearchBar\\) tempReplayMix else replayMix\\)\\n                                        \\.map \\{ it\\.videoId \\}\\n",
+        "",
+        dynamic,
+    )
+    dynamic = re.sub(
+        r"    /\\*\\*\\n     \\* The local Replay Mix:.*?\\n    data object ReplayMix : LibraryDynamicPlaylistType\\(\\)\\n\\n",
+        "",
+        dynamic,
+        flags=re.DOTALL,
+    )
+    if "ReplayMix" in dynamic or "replay_mix" in dynamic or "replayMix" in dynamic or "tempReplayMix" in dynamic:
+        raise SystemExit("Replay Mix references remain in LibraryDynamicPlaylistScreen after V17 exclusion.")
+    (ROOT / dynamic_path).write_text(dynamic)
+
+strip_replay_mix()
+
 print("Applied the selected 2.7 app, library, lyrics, theme, equalizer and desktop changes.")
 
 # Add only resources used by the selected features. Search Settings, app icons and AI-provider
