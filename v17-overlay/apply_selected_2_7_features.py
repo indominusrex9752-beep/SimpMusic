@@ -139,72 +139,214 @@ def expose_radio_builder(source: str) -> str:
 edit(LIBRARY_SCREEN, expose_radio_builder)
 
 
-# Replay Mix is explicitly excluded from V17. The selected 2.7 library diff can contain
-# references to its optional local-tracking strings, so strip only those UI/type branches.
+# Replay Mix is explicitly excluded from V17. Remove its UI, state, routing and
+# data-loader branches from the selected 2.7 files while preserving unrelated library work.
+def remove_kotlin_block(source: str, start_pattern: str, label: str) -> str:
+    match = re.search(start_pattern, source, re.MULTILINE)
+    if not match:
+        return source
+    opening = source.find("{", match.end())
+    if opening < 0:
+        raise SystemExit(f"{label}: opening brace not found")
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                finish = index + 1
+                if finish < len(source) and source[finish] == "\n":
+                    finish += 1
+                return source[:match.start()] + source[finish:]
+    raise SystemExit(f"{label}: unterminated Kotlin block")
+
+def remove_when_branch(source: str, marker: str, label: str) -> str:
+    lines = source.splitlines(keepends=True)
+    index = 0
+    removed = 0
+    while index < len(lines):
+        line = lines[index]
+        if marker not in line or "->" not in line:
+            index += 1
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        branch = [line]
+        # Braced branches are removed by balanced-brace depth.
+        if "{" in line:
+            depth = line.count("{") - line.count("}")
+            index += 1
+            while depth > 0 and index < len(lines):
+                depth += lines[index].count("{") - lines[index].count("}")
+                branch.append(lines[index])
+                index += 1
+            if depth != 0:
+                raise SystemExit(f"{label}: unterminated braced branch")
+        else:
+            index += 1
+            # Expression branches can continue over multiple lines. Stop at the next
+            # sibling case or the closing brace of the surrounding when expression.
+            while index < len(lines):
+                candidate = lines[index]
+                stripped = candidate.lstrip(" ")
+                candidate_indent = len(candidate) - len(stripped)
+                if candidate.strip() == "}":
+                    break
+                if candidate_indent == indent and "->" in candidate:
+                    break
+                branch.append(candidate)
+                index += 1
+        removed += 1
+        lines[index:index] = []
+        # Continue at the same index because the next branch shifted into place.
+    if removed == 0:
+        return source
+    return "".join(lines)
+
+def remove_doc_and_declaration(source: str, doc_marker: str, declaration_pattern: str, label: str) -> str:
+    doc_start = source.find(doc_marker)
+    declaration = re.search(declaration_pattern, source, re.MULTILINE)
+    if declaration is None:
+        return source
+    if doc_start >= 0 and doc_start < declaration.start():
+        return source[:doc_start] + source[declaration.end():]
+    return source[:declaration.start()] + source[declaration.end():]
+
 def strip_replay_mix():
     tiling_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/LibraryTilingBox.kt"
     tiling = (ROOT / tiling_path).read_text()
-    for line in (
-        "import simpmusic.composeapp.generated.resources.replay_mix\n",
-        "import simpmusic.composeapp.generated.resources.replay_mix_subtitle\n",
-    ):
-        tiling = tiling.replace(line, "")
+    tiling = "\n".join(
+        line for line in tiling.split("\n")
+        if "generated.resources.replay_mix" not in line
+        and "replayMix: LibraryCollectionPreview?" not in line
+        and "showReplayMix: Boolean" not in line
+    )
     tiling = re.sub(
-        r"        if \(showReplayMix\) \{\n            WideCard\(\n                title = Res\.string\.replay_mix,.*?\n            \) \{ open\(LibraryDynamicPlaylistType\.ReplayMix\) \}\n        \}\n",
-        "",
+        r"/\*\*\n \* The collections at the top of the Your library tab:.*?\n \*/",
+        "/** The collections at the top of the Your library tab. */",
         tiling,
+        count=1,
         flags=re.DOTALL,
     )
+    tiling = remove_kotlin_block(tiling, r"^[ \t]*if \(showReplayMix\) \{", "Replay Mix library card")
+    if re.search(r"ReplayMix|replayMix|replay_mix|showReplayMix", tiling):
+        raise SystemExit("Replay Mix references remain in LibraryTilingBox after V17 exclusion.")
     (ROOT / tiling_path).write_text(tiling)
+
+    library_screen_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/library/LibraryScreen.kt"
+    library_screen = (ROOT / library_screen_path).read_text()
+    library_screen = remove_kotlin_block(
+        library_screen,
+        r"^[ \t]*LaunchedEffect\(localTrackingEnabled\) \{",
+        "Replay Mix library preview refresh",
+    )
+    library_screen = "\n".join(
+        line for line in library_screen.split("\n")
+        if "val replayMixPreview by " not in line
+        and "replayMix = replayMixPreview" not in line
+        and "showReplayMix = localTrackingEnabled" not in line
+        and "Replay Mix is ranked from playback_event" not in line
+    )
+    if re.search(r"ReplayMix|replayMix|replay_mix|showReplayMix", library_screen):
+        raise SystemExit("Replay Mix references remain in LibraryScreen after V17 exclusion.")
+    (ROOT / library_screen_path).write_text(library_screen)
 
     dynamic_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/library/LibraryDynamicPlaylistScreen.kt"
     dynamic = (ROOT / dynamic_path).read_text()
-    for line in (
-        "import simpmusic.composeapp.generated.resources.replay_mix\n",
-        "import simpmusic.composeapp.generated.resources.replay_mix_subtitle\n",
-        "    val replayMix by viewModel.listReplayMixSong.collectAsStateWithLifecycle()\n",
-        "    var tempReplayMix by remember { mutableStateOf(emptyList<SongEntity>()) }\n",
-        "        tempReplayMix = replayMix.filter { it.matches(query) }\n",
-        "                    stringResource(Res.string.replay_mix_subtitle)\n",
-        "            ReplayMix -> Res.string.replay_mix\n",
-        "            ReplayMix -> \"replay_mix\"\n",
-        "                \"replay_mix\" -> ReplayMix\n",
+    dynamic = "\n".join(
+        line for line in dynamic.split("\n")
+        if "generated.resources.replay_mix" not in line
+        and "val replayMix by " not in line
+        and "var tempReplayMix by " not in line
+        and "tempReplayMix = replayMix.filter" not in line
+        and "Read on every visit too: the mix changes once a day." not in line
+    )
+    dynamic = remove_kotlin_block(
+        dynamic,
+        r"^[ \t]*if \(parsed == LibraryDynamicPlaylistType\.ReplayMix\) \{",
+        "Replay Mix dynamic-list refresh",
+    )
+    for marker, label in (
+        ("LibraryDynamicPlaylistType.ReplayMix", "Replay Mix dynamic-list branch"),
+        ("ReplayMix", "Replay Mix type branch"),
     ):
-        dynamic = dynamic.replace(line, "")
+        dynamic = remove_when_branch(dynamic, marker, label)
     dynamic = re.sub(
-        r"                LibraryDynamicPlaylistType\.ReplayMix ->\n                    stringResource\(Res\.string\.replay_mix_subtitle\)\n",
+        r"^[ \t]*/\*\*\n[ \t]*\* The local Replay Mix:.*?\n[ \t]*data object ReplayMix : LibraryDynamicPlaylistType\(\)\n\n",
         "",
         dynamic,
+        count=1,
+        flags=re.MULTILINE | re.DOTALL,
     )
-    dynamic = re.sub(
-        r"        // Read on every visit too: the mix changes once a day\.\n        if \(parsed == LibraryDynamicPlaylistType\.ReplayMix\) \{\n            viewModel\.getReplayMixSong\(\)\n        \}\n",
-        "",
-        dynamic,
-    )
-    dynamic = re.sub(
-        r"                    LibraryDynamicPlaylistType\.ReplayMix -> \{\n                        if \(query\.isNotEmpty\(\) && showSearchBar\) \{\n                            tempReplayMix\n                        \} else \{\n                            replayMix\n                        \}\n                    \}\n",
-        "",
-        dynamic,
-    )
-    # The select-all branch is formatted differently from the regular playlist branch.
-    # Match its indentation and expression independently, including the following map line.
-    dynamic = re.sub(
-        r"^[ \t]*LibraryDynamicPlaylistType\.ReplayMix ->\n[ \t]*\(if .*?tempReplayMix.*?replayMix\)\n[ \t]*\.map \{ it\.videoId \}\n",
-        "",
-        dynamic,
-        flags=re.MULTILINE,
-    )
-    dynamic = re.sub(
-        r"    /\*\*\n     \* The local Replay Mix:.*?\n    data object ReplayMix : LibraryDynamicPlaylistType\(\)\n\n",
-        "",
-        dynamic,
-        flags=re.DOTALL,
-    )
-    if "ReplayMix" in dynamic or "replay_mix" in dynamic or "replayMix" in dynamic or "tempReplayMix" in dynamic:
+    dynamic = re.sub(r"^[ \t]*ReplayMix -> Res\.string\.replay_mix\n", "", dynamic, flags=re.MULTILINE)
+    dynamic = re.sub(r'^[ \t]*"replay_mix" -> ReplayMix\n', "", dynamic, flags=re.MULTILINE)
+    if re.search(r"ReplayMix|replayMix|replay_mix|tempReplayMix", dynamic):
         raise SystemExit("Replay Mix references remain in LibraryDynamicPlaylistScreen after V17 exclusion.")
     (ROOT / dynamic_path).write_text(dynamic)
 
+    dynamic_vm_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/LibraryDynamicPlaylistViewModel.kt"
+    dynamic_vm = (ROOT / dynamic_vm_path).read_text()
+    dynamic_vm = re.sub(
+        r"^[ \t]*/\*\* The local Replay Mix, loaded on demand like the recap: see \[loadReplayMixSongs\]\. \*/\n"
+        r"[ \t]*private val _listReplayMixSong:.*?\n[ \t]*val listReplayMixSong:.*?\n",
+        "",
+        dynamic_vm,
+        count=1,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    dynamic_vm = remove_kotlin_block(dynamic_vm, r"^[ \t]*fun getReplayMixSong\(\) \{", "Replay Mix loader method")
+    dynamic_vm = re.sub(
+        r"^[ \t]*// A mix is named on its own, as YouTube's mixes are:.*?\n"
+        r"[ \t]*if \(type == LibraryDynamicPlaylistType\.ReplayMix\) return name\n",
+        "",
+        dynamic_vm,
+        count=1,
+        flags=re.MULTILINE,
+    )
+    dynamic_vm = re.sub(
+        r"^[ \t]*/\*\* Replay Mix plays as a radio and is extended once it runs out; every other list just ends\. \*/\n"
+        r"[ \t]*private fun queueId\(type: LibraryDynamicPlaylistType\): String\? =\n"
+        r"[ \t]*if \(type == LibraryDynamicPlaylistType\.ReplayMix\) REPLAY_MIX_PLAYLIST_ID else null\n\n",
+        "",
+        dynamic_vm,
+        count=1,
+        flags=re.MULTILINE,
+    )
+    dynamic_vm = dynamic_vm.replace("playlistId = queueId(type),", "playlistId = null,")
+    dynamic_vm = remove_when_branch(dynamic_vm, "LibraryDynamicPlaylistType.ReplayMix", "Replay Mix view-model branch")
+    dynamic_vm = re.sub(
+        r"/\*\*\n \* The local Replay Mix: the songs played most in the last \[REPLAY_MIX_WEEK_DAYS\].*?"
+        r"private const val REPLAY_MIX_LIMIT = 100\n\n",
+        "",
+        dynamic_vm,
+        count=1,
+        flags=re.DOTALL,
+    )
+    if re.search(r"ReplayMix|replayMix|REPLAY_MIX|replay_mix|loadReplayMixSongs", dynamic_vm):
+        raise SystemExit("Replay Mix references remain in LibraryDynamicPlaylistViewModel after V17 exclusion.")
+    (ROOT / dynamic_vm_path).write_text(dynamic_vm)
+
+    library_vm_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/LibraryViewModel.kt"
+    library_vm = (ROOT / library_vm_path).read_text()
+    library_vm = re.sub(
+        r"^[ \t]*/\*\* The Replay Mix card's count and top artwork, read each time the screen is shown: it changes daily\. \*/\n"
+        r"[ \t]*private val _replayMixPreview:.*?\n[ \t]*val replayMixPreview:.*?\n",
+        "",
+        library_vm,
+        count=1,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    library_vm = remove_kotlin_block(
+        library_vm,
+        r"^[ \t]*fun refreshReplayMixPreview\(\) \{",
+        "Replay Mix preview refresh method",
+    )
+    if re.search(r"ReplayMix|replayMix|REPLAY_MIX|replay_mix|loadReplayMixSongs", library_vm):
+        raise SystemExit("Replay Mix references remain in LibraryViewModel after V17 exclusion.")
+    (ROOT / library_vm_path).write_text(library_vm)
+
 strip_replay_mix()
+
 
 print("Applied the selected 2.7 app, library, lyrics, theme, equalizer and desktop changes.")
 
