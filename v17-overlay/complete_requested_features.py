@@ -42,6 +42,26 @@ for path in (
 ):
     copy_text(path)
 
+# SettingItem lives in commonMain. java.text.Normalizer is JVM-only and cannot be imported
+# by Kotlin Multiplatform common code, so keep Settings search normalization portable.
+setting_item_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/SettingItem.kt"
+setting_item = (ROOT / setting_item_path).read_text()
+setting_item = setting_item.replace("import java.text.Normalizer\\n", "")
+normalizer_block = """fun searchKey(text: String): String =
+    Normalizer
+        .normalize(text.lowercase(), Normalizer.Form.NFD)
+        .replace(CombiningMarks, "")
+        .replace('đ', 'd')
+"""
+portable_search_key = """fun searchKey(text: String): String = text.lowercase().replace('đ', 'd')
+"""
+if normalizer_block in setting_item:
+    setting_item = replace_once(setting_item, normalizer_block, portable_search_key, "Multiplatform Settings search normalization")
+elif "fun searchKey(text: String): String = text.lowercase().replace('đ', 'd')" not in setting_item:
+    raise SystemExit("Could not make Settings search normalization Kotlin Multiplatform-safe.")
+setting_item = setting_item.replace("private val CombiningMarks = Regex(\\"\\\\p{Mn}+\\")\\n", "")
+(ROOT / setting_item_path).write_text(setting_item)
+
 # Copy the official Android launcher-icon resources, including adaptive-icon XML and densities.
 listed = git_bytes("ls-tree", "-r", "--name-only", UPGRADE, "--", "androidApp/src/main/res", "composeApp/src/commonMain/composeResources/drawable").decode().splitlines()
 icon_paths = [
@@ -201,34 +221,41 @@ if "val appIcon = remember { currentAppIcon() }" not in settings:
 
 # The animated-lyrics preference must remain visible on Android 9-11 even though its
 # blurred artwork effect is only rendered on Android 12+ (rememberAnimatedLyricsBackground
-# enforces the platform capability). Keep the style picker and bass-pulse controls gated.
-lyrics_old = """                            // Same Android 12 gate as the style above: the background is a blur too, and without
-                            // one it would show four turning squares of artwork.
-                            SettingItem(
-                                title = stringResource(Res.string.animated_lyrics_background),
-                                subtitle = stringResource(Res.string.animated_lyrics_background_description),
-                                switch = (animatedLyricsBackground to { viewModel.setAnimatedLyricsBackground(it) }),
-                            )
-"""
-lyrics_new = """                        }
-                        SettingItem(
+# enforces the platform capability). apply_selected_2_7_features.py initially inserts this row
+# inside the style gate, so move only this row outside and leave the pulse control gated.
+animated_row_old = """                        SettingItem(
                             title = stringResource(Res.string.animated_lyrics_background),
-                            subtitle = stringResource(Res.string.animated_lyrics_background_description) +
-                                if (isLyricsBlurSupported()) "" else requiresAndroid12,
+                            subtitle = stringResource(Res.string.animated_lyrics_background_description),
                             switch = (animatedLyricsBackground to { viewModel.setAnimatedLyricsBackground(it) }),
                         )
-                        if (isLyricsBlurSupported()) {
 """
-if "title = stringResource(Res.string.animated_lyrics_background)" not in settings:
-    raise SystemExit("Animated lyrics preference anchor disappeared.")
-if lyrics_old in settings:
-    settings = replace_once(settings, lyrics_old, lyrics_new, "Show animated lyrics option on every Android version")
-elif 'subtitle = stringResource(Res.string.animated_lyrics_background_description) +' not in settings:
-    raise SystemExit("Could not safely move the animated lyrics option outside the Android 12 gate.")
+animated_row_new = """                    SettingItem(
+                        title = stringResource(Res.string.animated_lyrics_background),
+                        subtitle = stringResource(Res.string.animated_lyrics_background_description) +
+                            if (isLyricsBlurSupported()) "" else requiresAndroid12,
+                        switch = (animatedLyricsBackground to { viewModel.setAnimatedLyricsBackground(it) }),
+                    )
+"""
+if animated_row_old in settings:
+    settings = replace_once(settings, animated_row_old, "", "Extract animated lyrics preference from Android 12 gate")
+    gate_end = "\\n                    }\\n\\n                    // Independent of BOTH style settings"
+    if gate_end not in settings:
+        raise SystemExit("Could not locate the end of the Android 12 lyrics-style gate.")
+    settings = replace_once(
+        settings,
+        gate_end,
+        "\\n                    }\\n\\n" + animated_row_new + "                    // Independent of BOTH style settings",
+        "Place animated lyrics preference outside Android 12 gate",
+    )
+elif animated_row_new not in settings:
+    raise SystemExit("Could not locate the animated lyrics preference inserted by the selected-feature port.")
+
 animated_row = settings.index("title = stringResource(Res.string.animated_lyrics_background)")
 lyrics_gate = settings.rfind("if (isLyricsBlurSupported())", 0, animated_row)
-if lyrics_gate >= 0 and "\n                        }\n" not in settings[lyrics_gate:animated_row]:
+if lyrics_gate >= 0 and "\\n                    }\\n\\n" not in settings[lyrics_gate:animated_row]:
     raise SystemExit("Animated lyrics preference is still nested inside the Android 12-only section.")
+if "requiresAndroid12" not in settings[animated_row:animated_row + 500]:
+    raise SystemExit("Animated lyrics option does not explain the Android 12 effect requirement.")
 (ROOT / settings_path).write_text(settings)
 
 # Guard against silently shipping a partial implementation.
