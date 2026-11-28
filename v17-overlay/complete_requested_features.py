@@ -46,6 +46,10 @@ for path in (
 # by Kotlin Multiplatform common code, so keep Settings search normalization portable.
 setting_item_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/SettingItem.kt"
 setting_item = (ROOT / setting_item_path).read_text()
+setting_item = setting_item.replace(
+    "/** Lower case, accents dropped and đ read as d, so typing \"loi bai hat\" finds \"Lời bài hát\". */",
+    "/** Case-insensitive Settings search with Vietnamese đ/Đ normalized to d. */",
+)
 setting_item = setting_item.replace("import java.text.Normalizer\n", "")
 normalizer_block = """fun searchKey(text: String): String =
     Normalizer
