@@ -1080,6 +1080,16 @@ format_addition = """        AnalyticsUiState.DayRange.THIS_MONTH -> Res.string.
 """
 if "AnalyticsUiState.DayRange.SPECIFIC_DAY -> Res.string.specific_day" not in analytics_format:
     analytics_format = replace_once(analytics_format, format_anchor, format_anchor + format_addition, "V18 AnalyticsFormat exhaustive labels")
+format_import_anchor = "import simpmusic.composeapp.generated.resources.this_year\\n"
+format_imports = """import simpmusic.composeapp.generated.resources.this_month
+import simpmusic.composeapp.generated.resources.all_time
+import simpmusic.composeapp.generated.resources.custom_range
+import simpmusic.composeapp.generated.resources.specific_day
+import simpmusic.composeapp.generated.resources.specific_month
+import simpmusic.composeapp.generated.resources.specific_year
+"""
+if "import simpmusic.composeapp.generated.resources.specific_day" not in analytics_format:
+    analytics_format = replace_once(analytics_format, format_import_anchor, format_import_anchor + format_imports, "V18 AnalyticsFormat resource imports")
 (ROOT / analytics_format_path).write_text(analytics_format)
 
 # V18 app-icon previews also need the small optional resource field and renderer in the
@@ -1279,6 +1289,7 @@ if not state_class_match:
 analytics_vm = (
     analytics_vm[:state_class_match.start()]
     + state_class_match.group(1)
+    + state_class_match.group(2)
     + "    val specificPeriodDate: LocalDate? = null,"
     + analytics_vm[state_class_match.end():]
 )
