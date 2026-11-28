@@ -166,12 +166,16 @@ def strip_replay_mix():
         "    var tempReplayMix by remember { mutableStateOf(emptyList<SongEntity>()) }\n",
         "        tempReplayMix = replayMix.filter { it.matches(query) }\n",
         "                    stringResource(Res.string.replay_mix_subtitle)\n",
-        "                LibraryDynamicPlaylistType.ReplayMix ->\n",
         "            ReplayMix -> Res.string.replay_mix\n",
         "            ReplayMix -> \"replay_mix\"\n",
         "                \"replay_mix\" -> ReplayMix\n",
     ):
         dynamic = dynamic.replace(line, "")
+    dynamic = re.sub(
+        r"                LibraryDynamicPlaylistType\.ReplayMix ->\n                    stringResource\(Res\.string\.replay_mix_subtitle\)\n",
+        "",
+        dynamic,
+    )
     dynamic = re.sub(
         r"        // Read on every visit too: the mix changes once a day\.\n        if \(parsed == LibraryDynamicPlaylistType\.ReplayMix\) \{\n            viewModel\.getReplayMixSong\(\)\n        \}\n",
         "",
