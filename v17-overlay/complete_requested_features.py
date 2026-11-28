@@ -991,3 +991,62 @@ for marker in ("DayRange.THIS_MONTH", "DayRange.ALL_TIME", "DayRange.CUSTOM_RANG
     if marker not in analytics_screen:
         raise SystemExit(f"V18 official Insights UI filter is missing: {marker}")
 print("V18 custom Insights filters applied: this month, this year, all-time and custom date range.")
+
+
+# V18 app-icon previews also need the small optional resource field and renderer in the
+# Cloud-Sync Settings alert model. Keep the V17 SettingsViewModel and add only this UI capability.
+settings_vm_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/SettingsViewModel.kt"
+settings_vm = (ROOT / settings_vm_path).read_text()
+if "import org.jetbrains.compose.resources.DrawableResource\n" not in settings_vm:
+    settings_vm = replace_once(
+        settings_vm,
+        "import org.jetbrains.compose.resources.getString as formatString\n",
+        "import org.jetbrains.compose.resources.DrawableResource\nimport org.jetbrains.compose.resources.getString as formatString\n",
+        "V18 icon preview resource type",
+    )
+if "val icons: List<DrawableResource>? = null" not in settings_vm:
+    settings_vm = replace_once(
+        settings_vm,
+        "        val listSelect: List<Pair<Boolean, String>>,\n",
+        "        val listSelect: List<Pair<Boolean, String>>,\n        val icons: List<DrawableResource>? = null,\n",
+        "V18 optional icon thumbnails in Settings alerts",
+    )
+(ROOT / settings_vm_path).write_text(settings_vm)
+
+settings_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt"
+settings = (ROOT / settings_path).read_text()
+for anchor, addition, label in (
+    ("import androidx.compose.foundation.MarqueeAnimationMode\n", "import androidx.compose.foundation.Image\n", "V18 Settings image import"),
+    ("import androidx.compose.foundation.lazy.items\n", "import androidx.compose.foundation.lazy.itemsIndexed\n", "V18 Settings indexed items import"),
+    ("import org.jetbrains.compose.resources.stringResource\n", "import org.jetbrains.compose.resources.painterResource\n", "V18 Settings painter import"),
+):
+    if addition not in settings:
+        settings = replace_once(settings, anchor, anchor + addition, label)
+
+items_anchor = "                        items(alertState.selectOne.listSelect) { item ->"
+items_indexed = "                        itemsIndexed(alertState.selectOne.listSelect) { index, item ->"
+if items_anchor in settings:
+    settings = replace_once(settings, items_anchor, items_indexed, "V18 indexed icon selection rows")
+elif items_indexed not in settings:
+    raise SystemExit("Could not locate the single-select Settings alert renderer.")
+
+image_anchor = """                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = item.second,
+"""
+image_row = """                                Spacer(Modifier.width(8.dp))
+                                alertState.selectOne.icons?.getOrNull(index)?.let { icon ->
+                                    Image(
+                                        painter = painterResource(icon),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(40.dp),
+                                    )
+                                    Spacer(Modifier.width(12.dp))
+                                }
+                                Text(
+                                    text = item.second,
+"""
+if image_row not in settings:
+    settings = replace_once(settings, image_anchor, image_row, "V18 app icon preview rendering")
+(ROOT / settings_path).write_text(settings)
+print("V18 app icon preview resource model and alert renderer connected.")
