@@ -663,11 +663,11 @@ if n != 1:
 # brittle exact match of the next statement.
 fixed_range_guard = "if (_analyticsUIState.value.dayRange in setOf(AnalyticsUiState.DayRange.ALL_TIME, AnalyticsUiState.DayRange.CUSTOM_RANGE)) return"
 if fixed_range_guard not in analytics_vm:
-    step_period_pattern = re.compile(r"(?m)^([ \\t]*)fun stepPeriod\\(delta: Int\\) \\{[ \\t]*$")
+    step_period_pattern = re.compile(r"(?m)^([ \t]*)fun stepPeriod\(delta: Int\) \{[ \t]*$")
     if len(step_period_pattern.findall(analytics_vm)) != 1:
         raise SystemExit("V18 fixed-range period navigation: could not uniquely locate stepPeriod(delta: Int).")
     analytics_vm, n = step_period_pattern.subn(
-        lambda match: match.group(0) + "\\n" + match.group(1) + "    " + fixed_range_guard,
+        lambda match: match.group(0) + "\n" + match.group(1) + "    " + fixed_range_guard,
         analytics_vm,
         count=1,
     )
