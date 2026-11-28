@@ -1132,12 +1132,8 @@ analytics_vm = (
     + analytics_vm[range_for_match.end():]
 )
 
-analytics_vm = replace_once(
-    analytics_vm,
-    "        val state = _analyticsUIState.value\n",
-    "        val state = _analyticsUIState.value\n",
-    "V18 date-window state anchor",
-)
+# No source change is needed at this point. The state line occurs in multiple
+# AnalyticsViewModel functions, so do not run a global replace_once against it.
 analytics_vm = replace_once(
     analytics_vm,
     "            if (dayRange == AnalyticsUiState.DayRange.ALL_TIME ||\n                dayRange == AnalyticsUiState.DayRange.CUSTOM_RANGE\n",
