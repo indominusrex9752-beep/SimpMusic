@@ -170,6 +170,7 @@ def remove_when_branch(source: str, marker: str, label: str) -> str:
         if marker not in line or "->" not in line:
             index += 1
             continue
+        branch_start = index
         indent = len(line) - len(line.lstrip(" "))
         branch = [line]
         # Braced branches are removed by balanced-brace depth.
@@ -197,7 +198,8 @@ def remove_when_branch(source: str, marker: str, label: str) -> str:
                 branch.append(candidate)
                 index += 1
         removed += 1
-        lines[index:index] = []
+        del lines[branch_start:index]
+        index = branch_start
         # Continue at the same index because the next branch shifted into place.
     if removed == 0:
         return source
