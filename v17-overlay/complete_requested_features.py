@@ -583,7 +583,7 @@ new_range_for = """    private fun rangeFor(
             }
 
             AnalyticsUiState.DayRange.THIS_MONTH -> {
-                val monthStart = LocalDate(today.year, today.month.number, 1)
+                val monthStart = LocalDate(today.year, today.month.ordinal + 1, 1)
                     .minus(DatePeriod(months = offset))
                 val monthEnd =
                     if (offset == 0) today
@@ -702,7 +702,7 @@ new_chart = """    private fun getScrobblesLineChart(
                 AnalyticsUiState.DayRange.LAST_90_DAYS,
                 AnalyticsUiState.DayRange.THIS_YEAR,
                 AnalyticsUiState.DayRange.ALL_TIME -> {
-                    var month = LocalDate(startDate.year, startDate.month.number, 1)
+                    var month = LocalDate(startDate.year, startDate.month.ordinal + 1, 1)
                     while (month <= endDate) {
                         chartTypes += AnalyticsUiState.ChartType.Month(month.month, month.year)
                         month = month.plus(DatePeriod(months = 1))
@@ -728,7 +728,7 @@ new_chart = """    private fun getScrobblesLineChart(
                             weekStart = weekEnd.plus(DatePeriod(days = 1))
                         }
                     } else {
-                        var month = LocalDate(startDate.year, startDate.month.number, 1)
+                        var month = LocalDate(startDate.year, startDate.month.ordinal + 1, 1)
                         while (month <= endDate) {
                             chartTypes += AnalyticsUiState.ChartType.Month(month.month, month.year)
                             month = month.plus(DatePeriod(months = 1))
@@ -752,7 +752,7 @@ new_chart = """    private fun getScrobblesLineChart(
                             bucketEnd = bucket.end
                         }
                         is AnalyticsUiState.ChartType.Month -> {
-                            val firstOfMonth = LocalDate(bucket.year, bucket.month.number, 1)
+                            val firstOfMonth = LocalDate(bucket.year, bucket.month.ordinal + 1, 1)
                             val nextMonth = firstOfMonth.plus(DatePeriod(months = 1))
                             bucketStart = maxOf(startDate, firstOfMonth)
                             bucketEnd = minOf(endDate, nextMonth.minus(DatePeriod(days = 1)))
@@ -1139,7 +1139,7 @@ range_for_source = range_for_source.replace(
 
             AnalyticsUiState.DayRange.SPECIFIC_MONTH -> {
                 val selected = state.specificPeriodDate ?: today
-                val first = LocalDate(selected.year, selected.month.number, 1)
+                val first = LocalDate(selected.year, selected.month.ordinal + 1, 1)
                 val last = first.plus(DatePeriod(months = 1)).minus(DatePeriod(days = 1))
                 first.atTime(0, 0) to last.atTime(23, 59, 59)
             }
@@ -1309,7 +1309,7 @@ analytics_screen = replace_once(
     var showSpecificPeriod by rememberSaveable { mutableStateOf(false) }
     var specificPeriodMode by remember { mutableStateOf(AnalyticsUiState.DayRange.SPECIFIC_MONTH) }
     val today = kotlinx.datetime.Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
-    var selectedMonth by rememberSaveable { mutableIntStateOf(today.month.number) }
+    var selectedMonth by rememberSaveable { mutableIntStateOf(today.month.ordinal + 1) }
     var selectedYear by rememberSaveable { mutableIntStateOf(today.year) }
     var monthMenuExpanded by remember { mutableStateOf(false) }
     var yearMenuExpanded by remember { mutableStateOf(false) }
