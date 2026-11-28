@@ -160,6 +160,22 @@ jobs:
           fullscreen = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/FullscreenLyricsContent.kt")
           if "LyricsFlowBackground" not in fullscreen or not background.strip():
               raise SystemExit("Animated lyrics background is incomplete.")
+          if "showReplayMix = true" not in read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/library/LibraryScreen.kt"):
+              raise SystemExit("Replay Mix card is still hidden behind the legacy local-tracking toggle.")
+
+          automix = read("core/media/media3/src/main/java/com/maxrave/media3/exoplayer/CrossfadeExoPlayerAdapter.kt")
+          if "TransitionPlanner.plan(" not in automix:
+              raise SystemExit("AutoMix outro/drop-aware transition planner is not connected to playback.")
+          sheet = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/ModalBottomSheet.kt")
+          if "LocalLiquidGlassEnabled.current" not in sheet:
+              raise SystemExit("Liquid Glass sheet styling is not connected to the setting.")
+
+          search_settings = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt")
+          if "SearchTextField(" not in search_settings or "CompositionLocalProvider(LocalSettingSearch provides searchText)" not in search_settings:
+              raise SystemExit("Settings search field or filtering provider is missing.")
+          app_icons = read("composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/AppIcon.android.kt")
+          if "setComponentEnabledSetting" not in app_icons or "AppIconPixel" not in read("androidApp/src/main/AndroidManifest.xml"):
+              raise SystemExit("Android app icon chooser is not connected to launcher aliases.")
 
           theme = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/theme/Theme.kt")
           settings = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt")
