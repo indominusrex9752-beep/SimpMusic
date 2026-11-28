@@ -928,6 +928,15 @@ for imp in (
                 "V18 Analytics range resources",
             )
 
+# The selected Compose Material3 version does not expose DateRangePicker. Custom
+# ranges use validated ISO date text fields instead, so strip stale range-picker imports.
+analytics_screen = "\n".join(
+    line for line in analytics_screen.splitlines()
+    if "rememberDateRangePickerState" not in line
+    and "DateRangePicker" not in line
+    and "DatePickerDialog" not in line
+) + "\n"
+
 analytics_screen = replace_once(
     analytics_screen,
     "                onPick = { analyticsViewModel.setDayRange(it) },\n",
@@ -946,7 +955,8 @@ private fun DayRangePill(
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     var showCustomRange by rememberSaveable { mutableStateOf(false) }
-    val pickerState = rememberDateRangePickerState()
+    var startDateText by rememberSaveable { mutableStateOf("2026-01-01") }
+    var endDateText by rememberSaveable { mutableStateOf("2026-01-01") }
     val label =
         stringResource(
             when (uiState.dayRange) {
@@ -1012,28 +1022,37 @@ private fun DayRangePill(
     }
 
     if (showCustomRange) {
-        DatePickerDialog(
+        AlertDialog(
             onDismissRequest = { showCustomRange = false },
+            title = { Text("Custom date range") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = startDateText,
+                        onValueChange = { startDateText = it },
+                        label = { Text("Start date (YYYY-MM-DD)") },
+                        singleLine = true,
+                    )
+                    OutlinedTextField(
+                        value = endDateText,
+                        onValueChange = { endDateText = it },
+                        label = { Text("End date (YYYY-MM-DD)") },
+                        singleLine = true,
+                    )
+                }
+            },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        val startMillis = pickerState.selectedStartDateMillis
-                        val endMillis = pickerState.selectedEndDateMillis
-                        if (startMillis != null && endMillis != null) {
-                            val start = Instant.fromEpochMilliseconds(startMillis).toLocalDateTime(TimeZone.UTC).date
-                            val end = Instant.fromEpochMilliseconds(endMillis).toLocalDateTime(TimeZone.UTC).date
-                            onCustomRange(start, end)
-                            showCustomRange = false
-                        }
-                    },
-                ) { Text("Apply") }
+                TextButton(onClick = {
+                    val start = runCatching { LocalDate.parse(startDateText.trim()) }.getOrNull()
+                    val end = runCatching { LocalDate.parse(endDateText.trim()) }.getOrNull()
+                    if (start != null && end != null && start <= end) {
+                        onCustomRange(start, end)
+                        showCustomRange = false
+                    }
+                }) { Text("Apply") }
             },
-            dismissButton = {
-                TextButton(onClick = { showCustomRange = false }) { Text("Cancel") }
-            },
-        ) {
-            DateRangePicker(state = pickerState, modifier = Modifier.height(500.dp))
-        }
+            dismissButton = { TextButton(onClick = { showCustomRange = false }) { Text("Cancel") } },
+        )
     }
 }
 
@@ -1123,6 +1142,22 @@ if "val icons: List<DrawableResource>? = null" not in settings_vm:
 
 settings_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt"
 settings = (ROOT / settings_path).read_text()
+for resource in (
+    "app_icon_option_liquid_glass",
+    "app_icon_option_old_school",
+    "app_icon_option_minimalism_light",
+    "app_icon_option_minimalism_dark",
+    "app_icon_option_pixel",
+):
+    resource_import = f"import simpmusic.composeapp.generated.resources.{resource}\n"
+    if resource_import not in settings:
+        settings = replace_once(
+            settings,
+            "import simpmusic.composeapp.generated.resources.app_icon_close_warning\n",
+            "import simpmusic.composeapp.generated.resources.app_icon_close_warning\n" + resource_import,
+            f"V18 {resource} drawable resource import",
+        )
+
 for anchor, addition, label in (
     ("import androidx.compose.foundation.MarqueeAnimationMode\n", "import androidx.compose.foundation.Image\n", "V18 Settings image import"),
     ("import androidx.compose.foundation.lazy.items\n", "import androidx.compose.foundation.lazy.itemsIndexed\n", "V18 Settings indexed items import"),
