@@ -23,6 +23,7 @@ jobs:
           mkdir -p v17-overlay
           git show origin/Version-Upgrade:v17-overlay/merge_custom_insights.py > v17-overlay/merge_custom_insights.py
           git show origin/Version-Upgrade:v17-overlay/apply_selected_2_7_features.py > v17-overlay/apply_selected_2_7_features.py
+          git show origin/Version-Upgrade:v17-overlay/complete_requested_features.py > v17-overlay/complete_requested_features.py
           git show origin/Version-Upgrade:SimpMusic-Cloud-Sync-V17-History-Upsert.patch > SimpMusic-Cloud-Sync-V17-History-Upsert.patch
 
       - name: Pin the 2.7-compatible SimpCloud core
@@ -125,6 +126,8 @@ jobs:
         run: |
           python3 -m py_compile v17-overlay/apply_selected_2_7_features.py
           python3 v17-overlay/apply_selected_2_7_features.py
+          python3 -m py_compile v17-overlay/complete_requested_features.py
+          python3 v17-overlay/complete_requested_features.py
 
       - name: Validate selected 2.7 features and preserved custom systems
         run: |
