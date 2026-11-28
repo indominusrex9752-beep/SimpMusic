@@ -61,6 +61,10 @@ manifest_path = "androidApp/src/main/AndroidManifest.xml"
 manifest = (ROOT / manifest_path).read_text()
 official_manifest = upstream(manifest_path).decode("utf-8")
 if "AppIconLiquidGlass" not in manifest:
+    main_launcher = '                <category android:name="android.intent.category.LAUNCHER" />\\n'
+    if manifest.count(main_launcher) != 1:
+        raise SystemExit("Expected exactly one legacy MainActivity launcher category before adding icon aliases.")
+    manifest = replace_once(manifest, main_launcher, "", "Move launcher entry to selectable app-icon aliases")
     start = official_manifest.find("        <!-- Selectable app icons")
     end = official_manifest.find("        <provider", start)
     if start < 0 or end < 0:
