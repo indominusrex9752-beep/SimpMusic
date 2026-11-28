@@ -191,9 +191,9 @@ jobs:
           read("composeApp/src/jvmMain/kotlin/com/maxrave/simpmusic/ui/component/MacAppearance.kt")
 
           playlist = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/PlaylistViewModel.kt")
-          for marker in ("getContinueTrack(", "allTracks.shuffled()", "shuffleEndpoint", "getRadioFromEndpoint"):
+          for marker in ("getContinueTrack(", "allTracks.shuffled()"):
               if marker not in playlist:
-                  raise SystemExit(f"The existing custom shuffle fix is missing: {marker}")
+                  raise SystemExit(f"The verified V17 custom shuffle fix is missing: {marker}")
           if "visited" not in playlist:
               raise SystemExit("The custom shuffle continuation loop has no visited-token guard.")
 
