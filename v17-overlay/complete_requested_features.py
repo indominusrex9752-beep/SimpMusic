@@ -815,12 +815,38 @@ analytics_vm = replace_once(
     "    val periodEnd: LocalDate? = null,\n    val customStartDate: LocalDate? = null,\n    val customEndDate: LocalDate? = null,\n",
     "V18 custom date-range state",
 )
-analytics_vm = replace_once(
-    analytics_vm,
-    "        LAST_90_DAYS(90),\n\n        /** Length is unused — a year steps by calendar years, see rangeFor. */\n        THIS_YEAR(365),\n",
-    "        LAST_90_DAYS(90),\n        THIS_MONTH(31),\n\n        /** Length is unused — calendar periods are resolved in rangeFor. */\n        THIS_YEAR(365),\n        ALL_TIME(0),\n        CUSTOM_RANGE(0),\n",
-    "V18 Analytics range options",
+# The Insights archive and official 2.7 source use different comments/spacing here.
+# Extend the actual enum structurally, adding only missing values.
+day_range_enum = re.compile(
+    r"(?ms)(enum class DayRange\\s*\\(\\s*val lengthInDays:\\s*Int\\s*,?\\s*\\)\\s*\\{)(.*?)(^\\s*\\})"
 )
+enum_match = day_range_enum.search(analytics_vm)
+if not enum_match:
+    raise SystemExit("V18 Analytics range options: could not locate DayRange enum.")
+enum_body = enum_match.group(2)
+required_ranges = (
+    ("THIS_MONTH", 31),
+    ("ALL_TIME", 0),
+    ("CUSTOM_RANGE", 0),
+    ("SPECIFIC_DAY", 1),
+    ("SPECIFIC_MONTH", 31),
+    ("SPECIFIC_YEAR", 365),
+)
+missing_ranges = [
+    f"        {name}({length})"
+    for name, length in required_ranges
+    if not re.search(rf"(?m)^\\s*{name}\\s*\\(", enum_body)
+]
+if missing_ranges:
+    body = enum_body.rstrip()
+    if body and not body.endswith(","):
+        body += ","
+    body += "\\n" + ",\\n".join(missing_ranges) + ",\\n"
+    analytics_vm = (
+        analytics_vm[:enum_match.start(2)]
+        + body
+        + analytics_vm[enum_match.end(2):]
+    )
 (ROOT / analytics_vm_path).write_text(analytics_vm)
 
 # Extend the official 2.7 range pill with month/all-time choices and a native date-range picker.
