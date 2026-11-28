@@ -5,13 +5,13 @@ import com.maxrave.domain.data.model.radiobuilder.RadioBuilder
 import com.maxrave.domain.data.model.radiobuilder.RadioChipGroup
 import com.maxrave.domain.data.model.radiobuilder.RadioSeed
 import com.maxrave.domain.data.model.radiobuilder.RadioSeedKind
-import com.maxrave.domain.repository.AnalyticsRepository
 import com.maxrave.domain.repository.HomeRepository
 import com.maxrave.domain.repository.SongRepository
 import com.maxrave.domain.utils.Resource
 import com.maxrave.simpmusic.viewModel.base.BaseViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import simpmusic.composeapp.generated.resources.Res
 import simpmusic.composeapp.generated.resources.error
@@ -19,12 +19,11 @@ import simpmusic.composeapp.generated.resources.error
 /**
  * YouTube Music's radio builder, filled in with this device's listening: pick artists, songs and
  * genres, optionally tune, and Done opens the ONE tuned radio they make in the Playlist page's radio
- * mode. A web sign-in gets only artists from YouTube, so the grid adds the top of the local Replay Mix
+ * mode. A web sign-in gets only artists from YouTube, so the grid adds this device's most-played songs
  * (`RDATv<videoId>`) and the genres YouTube puts on their radios (`RDATG<id>E`), as the iOS app shows.
  */
 class RadioBuilderViewModel(
     private val homeRepository: HomeRepository,
-    private val analyticsRepository: AnalyticsRepository,
     private val songRepository: SongRepository,
 ) : BaseViewModel() {
     private val _uiState = MutableStateFlow<RadioBuilderUIState>(RadioBuilderUIState.Loading)
@@ -63,13 +62,13 @@ class RadioBuilderViewModel(
     }
 
     /**
-     * The grid: YouTube's artists, the top [LOCAL_SONGS] of the local Replay Mix (this week's most
-     * played, then this month's) and the genres of its top [GENRE_SOURCES], shuffled together. A source
+     * The grid: YouTube's artists, this device's top [LOCAL_SONGS] most-played songs and the genres
+     * of those top [GENRE_SOURCES] songs, shuffled together. A source
      * that fails to read is left out.
      */
     private suspend fun withLocalSeeds(youTube: List<RadioSeed>): List<RadioSeed> {
         val songs =
-            runCatching { loadReplayMixSongs(analyticsRepository, songRepository) }
+            runCatching { songRepository.getMostPlayedSongs().first() }
                 .getOrDefault(emptyList())
         val songSeeds =
             songs.take(LOCAL_SONGS).map { song ->
