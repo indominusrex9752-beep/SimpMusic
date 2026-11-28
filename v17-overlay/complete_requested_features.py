@@ -834,7 +834,11 @@ for field in ("customStartDate", "customEndDate"):
 if analytics_vm.count("fun setCustomRange(") != 1:
     raise SystemExit("V18 custom date-range setter validation failed.")
 for field in ("customStartDate", "customEndDate"):
-    if len(re.findall(rf"(?m)^\\s*val {field}: LocalDate\\? = null,", analytics_vm)) != 1:
+    declaration_count = sum(
+        line.strip() == f"val {field}: LocalDate? = null,"
+        for line in analytics_vm.splitlines()
+    )
+    if declaration_count != 1:
         raise SystemExit(f"V18 custom date-range state validation failed for {field}.")
 
 # The Insights archive and official 2.7 source use different comments/spacing here.
