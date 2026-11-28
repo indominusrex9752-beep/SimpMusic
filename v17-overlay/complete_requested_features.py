@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Complete the six requested V17 features without replacing custom cloud-sync or Insights code."""
+"""Complete selected V17 features without replacing custom cloud-sync or Insights code."""
 from pathlib import Path
 import re
 import subprocess
@@ -199,28 +199,9 @@ if "val appIcon = remember { currentAppIcon() }" not in settings:
 
 (ROOT / settings_path).write_text(settings)
 
-# Replay Mix was present in source but hidden whenever the separate legacy local-tracking switch
-# was false. V17's custom Insights records listening independently, so expose the card and refresh
-# its preview whenever the Library screen is opened.
-library_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/library/LibraryScreen.kt"
-library = (ROOT / library_path).read_text()
-old_refresh = """    LaunchedEffect(localTrackingEnabled) {
-        if (localTrackingEnabled) viewModel.refreshReplayMixPreview()
-    }"""
-new_refresh = """    LaunchedEffect(Unit) { viewModel.refreshReplayMixPreview() }"""
-if old_refresh not in library:
-    raise SystemExit("Could not find the legacy Replay Mix refresh gate; refusing to ship a visible but empty card.")
-library = replace_once(library, old_refresh, new_refresh, "Replay Mix preview refresh")
-if "showReplayMix = localTrackingEnabled" not in library:
-    raise SystemExit("Could not find the legacy Replay Mix visibility gate.")
-library = replace_once(library, "showReplayMix = localTrackingEnabled", "showReplayMix = true", "Always-visible Replay Mix card")
-(ROOT / library_path).write_text(library)
-
 # Guard against silently shipping a partial implementation.
 checks = {
     settings_path: ("SearchTextField(", "CompositionLocalProvider(LocalSettingSearch provides searchText)", "currentAppIcon()", "setAppIcon(style)"),
-    library_path: ("showReplayMix = true", "refreshReplayMixPreview()"),
-    "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/LibraryTilingBox.kt": ("if (showReplayMix)", "LibraryDynamicPlaylistType.ReplayMix"),
     "composeApp/src/androidMain/kotlin/com/maxrave/simpmusic/expect/AppIcon.android.kt": ("setComponentEnabledSetting", "AppIconPixel"),
     manifest_path: ("AppIconLiquidGlass", "AppIconPixel"),
 }
@@ -230,4 +211,4 @@ for path, markers in checks.items():
         if marker not in content:
             raise SystemExit(f"Requested V17 feature wiring missing from {path}: {marker}")
 
-print("V17 requested-feature integration: Settings search, Android app icon chooser, and always-visible Replay Mix wired.")
+print("V17 requested-feature integration: Settings search and Android app icon chooser wired.")
