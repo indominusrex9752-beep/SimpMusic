@@ -290,6 +290,12 @@ def strip_replay_mix():
 
     dynamic_vm_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/LibraryDynamicPlaylistViewModel.kt"
     dynamic_vm = (ROOT / dynamic_vm_path).read_text()
+    # The selected 2.7 file imports this core constant solely for Replay Mix queue routing.
+    # Remove that import explicitly; the branch and loader cleanup below remove its call sites.
+    dynamic_vm = "\n".join(
+        line for line in dynamic_vm.split("\n")
+        if "import com.maxrave.domain.utils.REPLAY_MIX_PLAYLIST_ID" not in line
+    )
     dynamic_vm = re.sub(
         r"^[ \t]*/\*\* The local Replay Mix, loaded on demand like the recap: see \[loadReplayMixSongs\]\. \*/\n"
         r"[ \t]*private val _listReplayMixSong:.*?\n[ \t]*val listReplayMixSong:.*?\n",
