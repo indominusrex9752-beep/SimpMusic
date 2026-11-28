@@ -156,11 +156,14 @@ jobs:
           if "LyricsFlowBackground" not in fullscreen or not background.strip():
               raise SystemExit("Animated lyrics background is incomplete.")
           automix = read("core/media/media3/src/main/java/com/maxrave/media3/exoplayer/CrossfadeExoPlayerAdapter.kt")
-          if "TransitionPlanner.plan(" not in automix:
-              raise SystemExit("AutoMix outro/drop-aware transition planner is not connected to playback.")
+          if "TransitionPlanner.plan(" not in automix or "CROSSFADE_DURATION_AUTO" not in automix or "isAutoMode" not in automix:
+              raise SystemExit("AutoMix is not connected to the automatic crossfade playback path.")
+          settings_for_effects = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt")
+          if "crossfade_auto" not in settings_for_effects:
+              raise SystemExit("The automatic crossfade duration option is not exposed in Settings.")
           sheet = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/ModalBottomSheet.kt")
-          if "LocalLiquidGlassEnabled.current" not in sheet:
-              raise SystemExit("Liquid Glass sheet styling is not connected to the setting.")
+          if "LocalLiquidGlassEnabled.current" not in sheet or "setEnableLiquidGlass" not in settings_for_effects:
+              raise SystemExit("Liquid Glass sheet styling is not connected to its Settings toggle.")
 
           search_settings = read("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt")
           if "SearchTextField(" not in search_settings or "CompositionLocalProvider(LocalSettingSearch provides searchText)" not in search_settings:
