@@ -145,12 +145,12 @@ def strip_replay_mix():
     tiling_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/LibraryTilingBox.kt"
     tiling = (ROOT / tiling_path).read_text()
     for line in (
-        "import simpmusic.composeapp.generated.resources.replay_mix\\n",
-        "import simpmusic.composeapp.generated.resources.replay_mix_subtitle\\n",
+        "import simpmusic.composeapp.generated.resources.replay_mix\n",
+        "import simpmusic.composeapp.generated.resources.replay_mix_subtitle\n",
     ):
         tiling = tiling.replace(line, "")
     tiling = re.sub(
-        r"        if \\(showReplayMix\\) \\{\\n            WideCard\\(\\n                title = Res\\.string\\.replay_mix,.*?\\n            \\) \\{ open\\(LibraryDynamicPlaylistType\\.ReplayMix\\) \\}\\n        \\}\\n",
+        r"        if \(showReplayMix\) \{\n            WideCard\(\n                title = Res\.string\.replay_mix,.*?\n            \) \{ open\(LibraryDynamicPlaylistType\.ReplayMix\) \}\n        \}\n",
         "",
         tiling,
         flags=re.DOTALL,
@@ -160,34 +160,34 @@ def strip_replay_mix():
     dynamic_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/library/LibraryDynamicPlaylistScreen.kt"
     dynamic = (ROOT / dynamic_path).read_text()
     for line in (
-        "import simpmusic.composeapp.generated.resources.replay_mix\\n",
-        "import simpmusic.composeapp.generated.resources.replay_mix_subtitle\\n",
-        "    val replayMix by viewModel.listReplayMixSong.collectAsStateWithLifecycle()\\n",
-        "    var tempReplayMix by remember { mutableStateOf(emptyList<SongEntity>()) }\\n",
-        "        tempReplayMix = replayMix.filter { it.matches(query) }\\n",
-        "                    stringResource(Res.string.replay_mix_subtitle)\\n",
-        "            ReplayMix -> Res.string.replay_mix\\n",
-        "            ReplayMix -> \\"replay_mix\\"\\n",
-        "                \\"replay_mix\\" -> ReplayMix\\n",
+        "import simpmusic.composeapp.generated.resources.replay_mix\n",
+        "import simpmusic.composeapp.generated.resources.replay_mix_subtitle\n",
+        "    val replayMix by viewModel.listReplayMixSong.collectAsStateWithLifecycle()\n",
+        "    var tempReplayMix by remember { mutableStateOf(emptyList<SongEntity>()) }\n",
+        "        tempReplayMix = replayMix.filter { it.matches(query) }\n",
+        "                    stringResource(Res.string.replay_mix_subtitle)\n",
+        "            ReplayMix -> Res.string.replay_mix\n",
+        "            ReplayMix -> \"replay_mix\"\n",
+        "                \"replay_mix\" -> ReplayMix\n",
     ):
         dynamic = dynamic.replace(line, "")
     dynamic = re.sub(
-        r"        // Read on every visit too: the mix changes once a day\\.\\n        if \\(parsed == LibraryDynamicPlaylistType\\.ReplayMix\\) \\{\\n            viewModel\\.getReplayMixSong\\(\\)\\n        \\}\\n",
+        r"        // Read on every visit too: the mix changes once a day\.\n        if \(parsed == LibraryDynamicPlaylistType\.ReplayMix\) \{\n            viewModel\.getReplayMixSong\(\)\n        \}\n",
         "",
         dynamic,
     )
     dynamic = re.sub(
-        r"                    LibraryDynamicPlaylistType\\.ReplayMix -> \\{\\n                        if \\(query\\.isNotEmpty\\(\\) && showSearchBar\\) \\{\\n                            tempReplayMix\\n                        \\} else \\{\\n                            replayMix\\n                        \\}\\n                    \\}\\n",
+        r"                    LibraryDynamicPlaylistType\.ReplayMix -> \{\n                        if \(query\.isNotEmpty\(\) && showSearchBar\) \{\n                            tempReplayMix\n                        \} else \{\n                            replayMix\n                        \}\n                    \}\n",
         "",
         dynamic,
     )
     dynamic = re.sub(
-        r"                                LibraryDynamicPlaylistType\\.ReplayMix ->\\n                                    \\(if \\(query\\.isNotEmpty\\(\\) && showSearchBar\\) tempReplayMix else replayMix\\)\\n                                        \\.map \\{ it\\.videoId \\}\\n",
+        r"                                LibraryDynamicPlaylistType\.ReplayMix ->\n                                    \(if \(query\.isNotEmpty\(\) && showSearchBar\) tempReplayMix else replayMix\)\n                                        \.map \{ it\.videoId \}\n",
         "",
         dynamic,
     )
     dynamic = re.sub(
-        r"    /\\*\\*\\n     \\* The local Replay Mix:.*?\\n    data object ReplayMix : LibraryDynamicPlaylistType\\(\\)\\n\\n",
+        r"    /\*\*\n     \* The local Replay Mix:.*?\n    data object ReplayMix : LibraryDynamicPlaylistType\(\)\n\n",
         "",
         dynamic,
         flags=re.DOTALL,
