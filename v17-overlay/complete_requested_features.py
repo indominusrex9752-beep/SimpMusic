@@ -865,7 +865,7 @@ for imp in (
     "import androidx.compose.material3.DateRangePicker\n",
     "import androidx.compose.material3.TextButton\n",
     "import androidx.compose.material3.rememberDateRangePickerState\n",
-    "import kotlinx.datetime.Instant\n",
+    "import kotlin.time.Instant\n",
     "import kotlinx.datetime.LocalDate\n",
     "import kotlinx.datetime.TimeZone\n",
     "import kotlinx.datetime.toLocalDateTime\n",
@@ -1308,7 +1308,7 @@ analytics_screen = replace_once(
     var showSpecificDay by rememberSaveable { mutableStateOf(false) }
     var showSpecificPeriod by rememberSaveable { mutableStateOf(false) }
     var specificPeriodMode by remember { mutableStateOf(AnalyticsUiState.DayRange.SPECIFIC_MONTH) }
-    val today = kotlinx.datetime.Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+    val today = kotlin.time.Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
     var selectedMonth by rememberSaveable { mutableIntStateOf(today.month.ordinal + 1) }
     var selectedYear by rememberSaveable { mutableIntStateOf(today.year) }
     var monthMenuExpanded by remember { mutableStateOf(false) }
