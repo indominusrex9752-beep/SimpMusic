@@ -376,7 +376,7 @@ new_home_method = """    fun getHomeItemList(params: String? = null) {
                                 _homeListState.value = ListState.PAGINATION_EXHAUST
                                 loading.value = false
                                 showSnackBarErrorState.emit(home.message)
-                                Logger.w("HomeViewModel", "getHomeItemList: \${home.message}")
+                                Logger.w("HomeViewModel", "getHomeItemList: ${home.message}")
                             }
 
                             else -> Unit
@@ -474,13 +474,13 @@ new_shuffle_branch = """            PlaylistUIEvent.Shuffle -> {
                                 listTracks = endpointTracks.toCollection(arrayListOf<Track>()),
                                 firstPlayedTrack = endpointFirst,
                                 playlistId = shuffleEndpoint.playlistId,
-                                playlistName = "\\\\"\${data.title}\\\\" \${getString(Res.string.shuffle)}",
+                                playlistName = "\\"${data.title}\\" ${getString(Res.string.shuffle)}",
                                 playlistType = PlaylistType.RADIO,
                                 continuation = endpointData?.second,
                             ),
                         )
                         loadMediaItem(endpointFirst, Config.RADIO_CLICK, 0)
-                        Logger.d(tag, "Native shuffle endpoint successful: \${endpointTracks.size} tracks")
+                        Logger.d(tag, "Native shuffle endpoint successful: ${endpointTracks.size} tracks")
                         return@launch
                     }
 
@@ -527,17 +527,17 @@ new_shuffle_branch = """            PlaylistUIEvent.Shuffle -> {
                                 listTracks = shuffledTracks.toCollection(arrayListOf<Track>()),
                                 firstPlayedTrack = firstTrack,
                                 playlistId = data.id,
-                                playlistName = "\\\\"\${data.title}\\\\" \${getString(Res.string.shuffle)}",
+                                playlistName = "\\"${data.title}\\" ${getString(Res.string.shuffle)}",
                                 playlistType = PlaylistType.PLAYLIST,
                                 continuation = null,
                             ),
                         )
                         loadMediaItem(firstTrack, Config.PLAYLIST_CLICK, 0)
-                        Logger.d(tag, "Full playlist shuffle fallback successful: \${shuffledTracks.size} tracks")
+                        Logger.d(tag, "Full playlist shuffle fallback successful: ${shuffledTracks.size} tracks")
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
-                        Logger.w(tag, "Full playlist shuffle fallback failed: \${e.message}")
+                        Logger.w(tag, "Full playlist shuffle fallback failed: ${e.message}")
                         makeToast("Couldn't load the complete playlist. Please try again.")
                     }
                 }
