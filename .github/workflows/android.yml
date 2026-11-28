@@ -1,10 +1,10 @@
-name: SimpMusic Debug APK V17 (Version Upgrade 2.7)
+name: SimpMusic Debug APK V18 (Ultimate SimpMusic 2.7)
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - Version-Upgrade
+      - Ultimate-Refinement 
 
 jobs:
   build:
