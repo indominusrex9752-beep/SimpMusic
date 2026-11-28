@@ -1217,7 +1217,7 @@ analytics_vm = replace_once(
     "V18 specific date selection handler",
 )
 state_class_match = re.search(
-    r"(?ms)(data class AnalyticsUiState\\s*\\(.*?)(^    val customEndDate: LocalDate\\? = null,$)",
+    r"(?ms)(data class AnalyticsUiState\s*\(.*?)(^    val customEndDate: LocalDate\? = null,$)",
     analytics_vm,
 )
 if not state_class_match:
@@ -1225,7 +1225,7 @@ if not state_class_match:
 analytics_vm = (
     analytics_vm[:state_class_match.start()]
     + state_class_match.group(1)
-    + "    val customEndDate: LocalDate? = null,\\n    val specificPeriodDate: LocalDate? = null,"
+    + "    val customEndDate: LocalDate? = null,\n    val specificPeriodDate: LocalDate? = null,"
     + analytics_vm[state_class_match.end():]
 )
 analytics_vm = replace_once(
