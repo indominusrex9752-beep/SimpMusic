@@ -375,7 +375,7 @@ new_home_method = """    fun getHomeItemList(params: String? = null) {
                                 _homeBackground.value = null
                                 _homeListState.value = ListState.PAGINATION_EXHAUST
                                 loading.value = false
-                                showSnackBarErrorState.emit(home.message)
+                                showSnackBarErrorState.emit(home.message ?: "Unable to load home data")
                                 Logger.w("HomeViewModel", "getHomeItemList: ${home.message}")
                             }
 
@@ -390,7 +390,7 @@ new_home_method = """    fun getHomeItemList(params: String? = null) {
                             is Resource.Success -> _exploreMoodItem.value = mood.data
                             is Resource.Error -> {
                                 _exploreMoodItem.value = null
-                                showSnackBarErrorState.emit(mood.message)
+                                showSnackBarErrorState.emit(mood.message ?: "Unable to load mood recommendations")
                             }
                             else -> Unit
                         }
@@ -403,7 +403,7 @@ new_home_method = """    fun getHomeItemList(params: String? = null) {
                             is Resource.Success -> _chart.value = chart.data
                             is Resource.Error -> {
                                 _chart.value = null
-                                showSnackBarErrorState.emit(chart.message)
+                                showSnackBarErrorState.emit(chart.message ?: "Unable to load chart")
                             }
                             else -> Unit
                         }
@@ -463,7 +463,7 @@ new_shuffle_branch = """            PlaylistUIEvent.Shuffle -> {
                     val endpointResult =
                         songRepository
                             .getRadioFromEndpoint(shuffleEndpoint)
-                            .firstOrNull { it !is Resource.Loading }
+                            .firstOrNull()
                     val endpointData = (endpointResult as? Resource.Success)?.data
                     val endpointTracks = endpointData?.first.orEmpty()
                     val endpointFirst = endpointTracks.firstOrNull()
@@ -1008,6 +1008,11 @@ if not pill_pattern.search(analytics_screen):
 analytics_screen, n = pill_pattern.subn(new_pill + "// ========== Header ==========", analytics_screen, count=1)
 if n != 1:
     raise SystemExit("Official Insights range picker replacement was not unique.")
+# The official UI only needs playCount; infer the custom artist-time model.
+analytics_screen = analytics_screen.replace(
+    "artists.map { (played: TopPlayedArtist, artist: ArtistEntity) ->",
+    "artists.map { (played, artist) ->",
+)
 (ROOT / analytics_screen_path).write_text(analytics_screen)
 
 # Add localized labels without replacing any existing resource entries.
@@ -1035,6 +1040,21 @@ for marker in ("DayRange.THIS_MONTH", "DayRange.ALL_TIME", "DayRange.CUSTOM_RANG
         raise SystemExit(f"V18 official Insights UI filter is missing: {marker}")
 print("V18 custom Insights filters applied: this month, this year, all-time and custom date range.")
 
+
+# Keep the custom Insights period-label helper exhaustive after extending DayRange.
+analytics_format_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/analytics/AnalyticsFormat.kt"
+analytics_format = (ROOT / analytics_format_path).read_text()
+format_anchor = "        AnalyticsUiState.DayRange.THIS_YEAR -> Res.string.this_year\\n"
+format_addition = """        AnalyticsUiState.DayRange.THIS_MONTH -> Res.string.this_month
+        AnalyticsUiState.DayRange.ALL_TIME -> Res.string.all_time
+        AnalyticsUiState.DayRange.CUSTOM_RANGE -> Res.string.custom_range
+        AnalyticsUiState.DayRange.SPECIFIC_DAY -> Res.string.specific_day
+        AnalyticsUiState.DayRange.SPECIFIC_MONTH -> Res.string.specific_month
+        AnalyticsUiState.DayRange.SPECIFIC_YEAR -> Res.string.specific_year
+"""
+if "AnalyticsUiState.DayRange.SPECIFIC_DAY -> Res.string.specific_day" not in analytics_format:
+    analytics_format = replace_once(analytics_format, format_anchor, format_anchor + format_addition, "V18 AnalyticsFormat exhaustive labels")
+(ROOT / analytics_format_path).write_text(analytics_format)
 
 # V18 app-icon previews also need the small optional resource field and renderer in the
 # Cloud-Sync Settings alert model. Keep the V17 SettingsViewModel and add only this UI capability.
@@ -1233,7 +1253,7 @@ if not state_class_match:
 analytics_vm = (
     analytics_vm[:state_class_match.start()]
     + state_class_match.group(1)
-    + "    val customEndDate: LocalDate? = null,\n    val specificPeriodDate: LocalDate? = null,"
+    + "    val specificPeriodDate: LocalDate? = null,"
     + analytics_vm[state_class_match.end():]
 )
 # DayRange was already extended structurally above. Do not apply a second
@@ -1300,7 +1320,7 @@ analytics_screen = replace_once(
 analytics_screen = replace_once(
     analytics_screen,
     "\n                AnalyticsUiState.DayRange.CUSTOM_RANGE -> Res.string.custom_range\n",
-    """                AnalyticsUiState.DayRange.CUSTOM_RANGE -> Res.string.custom_range
+    """\n                AnalyticsUiState.DayRange.CUSTOM_RANGE -> Res.string.custom_range
                 AnalyticsUiState.DayRange.SPECIFIC_DAY -> Res.string.specific_day
                 AnalyticsUiState.DayRange.SPECIFIC_MONTH -> Res.string.specific_month
                 AnalyticsUiState.DayRange.SPECIFIC_YEAR -> Res.string.specific_year
@@ -1310,7 +1330,7 @@ analytics_screen = replace_once(
 analytics_screen = replace_once(
     analytics_screen,
     "\n                                    AnalyticsUiState.DayRange.CUSTOM_RANGE -> Res.string.custom_range\n",
-    """                                    AnalyticsUiState.DayRange.CUSTOM_RANGE -> Res.string.custom_range
+    """\n                                    AnalyticsUiState.DayRange.CUSTOM_RANGE -> Res.string.custom_range
                                     AnalyticsUiState.DayRange.SPECIFIC_DAY -> Res.string.specific_day
                                     AnalyticsUiState.DayRange.SPECIFIC_MONTH -> Res.string.specific_month
                                     AnalyticsUiState.DayRange.SPECIFIC_YEAR -> Res.string.specific_year
