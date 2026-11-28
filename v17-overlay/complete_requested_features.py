@@ -1092,9 +1092,18 @@ print("V18 app icon preview resource model and alert renderer connected.")
 analytics_vm_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/AnalyticsViewModel.kt"
 analytics_vm = (ROOT / analytics_vm_path).read_text()
 
-analytics_vm = replace_once(
+range_for_match = re.search(
+    r"(?ms)^    private fun rangeFor\\(.*?(?=^    private fun loadPeriod\\(\\))",
     analytics_vm,
-    "            AnalyticsUiState.DayRange.CUSTOM_RANGE -> {\n",
+)
+if not range_for_match:
+    raise SystemExit("V18 specific date windows: could not isolate rangeFor().")
+range_for_source = range_for_match.group(0)
+specific_range_anchor = "            AnalyticsUiState.DayRange.CUSTOM_RANGE -> {\\n"
+if range_for_source.count(specific_range_anchor) != 1:
+    raise SystemExit("V18 specific date windows: rangeFor() does not contain exactly one custom-range branch.")
+range_for_source = range_for_source.replace(
+    specific_range_anchor,
     """            AnalyticsUiState.DayRange.SPECIFIC_DAY -> {
                 val selected = state.specificPeriodDate ?: today
                 selected.atTime(0, 0) to selected.atTime(23, 59, 59)
@@ -1115,7 +1124,12 @@ analytics_vm = replace_once(
 
             AnalyticsUiState.DayRange.CUSTOM_RANGE -> {
 """,
-    "V18 specific day/month/year date windows",
+    1,
+)
+analytics_vm = (
+    analytics_vm[:range_for_match.start()]
+    + range_for_source
+    + analytics_vm[range_for_match.end():]
 )
 
 analytics_vm = replace_once(
