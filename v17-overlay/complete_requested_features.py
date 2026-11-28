@@ -658,12 +658,21 @@ analytics_vm, n = stats_pattern.subn(new_stats, analytics_vm, count=1)
 if n != 1:
     raise SystemExit("AnalyticsViewModel.getPeriodStats replacement was not unique.")
 
-analytics_vm = replace_once(
-    analytics_vm,
-    "    fun stepPeriod(delta: Int) {\n        val next = (_analyticsUIState.value.periodOffset - delta).coerceAtLeast(0)\n",
-    "    fun stepPeriod(delta: Int) {\n        if (_analyticsUIState.value.dayRange in setOf(AnalyticsUiState.DayRange.ALL_TIME, AnalyticsUiState.DayRange.CUSTOM_RANGE)) return\n        val next = (_analyticsUIState.value.periodOffset - delta).coerceAtLeast(0)\n",
-    "V18 fixed-range period navigation",
-)
+# The custom Insights archive may carry a slightly different navigator body than
+# the Version-Upgrade branch. Insert the guard by function boundary, not by a
+# brittle exact match of the next statement.
+fixed_range_guard = "if (_analyticsUIState.value.dayRange in setOf(AnalyticsUiState.DayRange.ALL_TIME, AnalyticsUiState.DayRange.CUSTOM_RANGE)) return"
+if fixed_range_guard not in analytics_vm:
+    step_period_pattern = re.compile(r"(?m)^([ \\t]*)fun stepPeriod\\(delta: Int\\) \\{[ \\t]*$")
+    if len(step_period_pattern.findall(analytics_vm)) != 1:
+        raise SystemExit("V18 fixed-range period navigation: could not uniquely locate stepPeriod(delta: Int).")
+    analytics_vm, n = step_period_pattern.subn(
+        lambda match: match.group(0) + "\\n" + match.group(1) + "    " + fixed_range_guard,
+        analytics_vm,
+        count=1,
+    )
+    if n != 1:
+        raise SystemExit("V18 fixed-range period navigation guard was not inserted.")
 
 chart_pattern = re.compile(r"(?ms)^    private fun getScrobblesLineChart\(.*?(?=^    fun setDayRange\()")
 new_chart = """    private fun getScrobblesLineChart(
