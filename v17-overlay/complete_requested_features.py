@@ -561,3 +561,433 @@ if "homeRepository.getHomeData(" not in home_source or "homeRepository.getMoodAn
 if "YouTubeWatchEndpoint(" not in playlist_source or "Full playlist shuffle fallback successful" not in playlist_source:
     raise SystemExit("Endpoint-first shuffle or the complete-playlist fallback is missing.")
 print("V18 refinements applied: native-first shuffle, independent home loading, official Insights UI and icon previews.")
+
+
+# V18 custom Insights periods: month, year, all-time and a selectable date range.
+analytics_vm_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/AnalyticsViewModel.kt"
+analytics_vm = (ROOT / analytics_vm_path).read_text()
+
+range_pattern = re.compile(r"(?ms)^    private fun rangeFor\(.*?(?=^    private fun loadPeriod\(\))")
+new_range_for = """    private fun rangeFor(
+        dayRange: AnalyticsUiState.DayRange,
+        offset: Int,
+    ): Pair<LocalDateTime, LocalDateTime> {
+        val today = now().date
+        val state = _analyticsUIState.value
+        return when (dayRange) {
+            AnalyticsUiState.DayRange.THIS_YEAR -> {
+                val year = today.year - offset
+                val start = LocalDate(year, 1, 1)
+                val end = if (offset == 0) today else LocalDate(year, 12, 31)
+                start.atTime(0, 0) to end.atTime(23, 59, 59)
+            }
+
+            AnalyticsUiState.DayRange.THIS_MONTH -> {
+                val monthStart = LocalDate(today.year, today.month.number, 1)
+                    .minus(DatePeriod(months = offset))
+                val monthEnd =
+                    if (offset == 0) today
+                    else monthStart.plus(DatePeriod(months = 1)).minus(DatePeriod(days = 1))
+                monthStart.atTime(0, 0) to monthEnd.atTime(23, 59, 59)
+            }
+
+            AnalyticsUiState.DayRange.ALL_TIME ->
+                LocalDate(2026, 11, 1).atTime(0, 0) to today.atTime(23, 59, 59)
+
+            AnalyticsUiState.DayRange.CUSTOM_RANGE -> {
+                val start = state.customStartDate ?: LocalDate(2026, 11, 1)
+                val end = state.customEndDate ?: today
+                start.atTime(0, 0) to end.atTime(23, 59, 59)
+            }
+
+            else -> {
+                val length = dayRange.lengthInDays
+                val end = today.minus(DatePeriod(days = offset * length))
+                val start = end.minus(DatePeriod(days = length - 1))
+                start.atTime(0, 0) to end.atTime(23, 59, 59)
+            }
+        }
+    }
+
+"""
+if not range_pattern.search(analytics_vm):
+    raise SystemExit("Could not isolate AnalyticsViewModel.rangeFor for custom periods.")
+analytics_vm, n = range_pattern.subn(new_range_for, analytics_vm, count=1)
+if n != 1:
+    raise SystemExit("AnalyticsViewModel.rangeFor replacement was not unique.")
+
+analytics_vm = replace_once(
+    analytics_vm,
+    "        getScrobblesLineChart(state.dayRange, end.date)\n",
+    "        getScrobblesLineChart(state.dayRange, start.date, end.date)\n",
+    "V18 chart date-span wiring",
+)
+
+stats_pattern = re.compile(r"(?ms)^    private fun getPeriodStats\(.*?(?=^    /\*\*)")
+new_stats = """    private fun getPeriodStats(
+        dayRange: AnalyticsUiState.DayRange,
+        offset: Int,
+    ) {
+        viewModelScope.launch {
+            _analyticsUIState.update { it.copy(stats = LocalResource.Loading()) }
+            val (start, end) = rangeFor(dayRange, offset)
+            val current = analyticsRepository.getPeriodStats(start, end)
+            if (dayRange == AnalyticsUiState.DayRange.ALL_TIME ||
+                dayRange == AnalyticsUiState.DayRange.CUSTOM_RANGE
+            ) {
+                _analyticsUIState.update {
+                    it.copy(stats = LocalResource.Success(current), previousStats = null)
+                }
+            } else {
+                val (prevStart, prevEnd) = rangeFor(dayRange, offset + 1)
+                val previous = analyticsRepository.getPeriodStats(prevStart, prevEnd)
+                _analyticsUIState.update {
+                    it.copy(
+                        stats = LocalResource.Success(current),
+                        previousStats = previous.takeIf { p -> !p.isEmpty },
+                    )
+                }
+            }
+        }
+    }
+
+"""
+if not stats_pattern.search(analytics_vm):
+    raise SystemExit("Could not isolate AnalyticsViewModel.getPeriodStats.")
+analytics_vm, n = stats_pattern.subn(new_stats, analytics_vm, count=1)
+if n != 1:
+    raise SystemExit("AnalyticsViewModel.getPeriodStats replacement was not unique.")
+
+analytics_vm = replace_once(
+    analytics_vm,
+    "    fun stepPeriod(delta: Int) {\n        val next = (_analyticsUIState.value.periodOffset - delta).coerceAtLeast(0)\n",
+    "    fun stepPeriod(delta: Int) {\n        if (_analyticsUIState.value.dayRange in setOf(AnalyticsUiState.DayRange.ALL_TIME, AnalyticsUiState.DayRange.CUSTOM_RANGE)) return\n        val next = (_analyticsUIState.value.periodOffset - delta).coerceAtLeast(0)\n",
+    "V18 fixed-range period navigation",
+)
+
+chart_pattern = re.compile(r"(?ms)^    private fun getScrobblesLineChart\(.*?(?=^    fun setDayRange\()")
+new_chart = """    private fun getScrobblesLineChart(
+        dayRange: AnalyticsUiState.DayRange,
+        startDate: LocalDate,
+        endDate: LocalDate,
+    ) {
+        viewModelScope.launch {
+            _analyticsUIState.update { it.copy(scrobblesLineChart = LocalResource.Loading()) }
+            val chartTypes = mutableListOf<AnalyticsUiState.ChartType>()
+
+            when (dayRange) {
+                AnalyticsUiState.DayRange.LAST_7_DAYS -> {
+                    for (offset in 0 until 7) {
+                        chartTypes += AnalyticsUiState.ChartType.Day(endDate.minus(DatePeriod(days = offset)))
+                    }
+                }
+
+                AnalyticsUiState.DayRange.LAST_30_DAYS -> {
+                    for (week in 0 until 5) {
+                        val end = endDate.minus(DatePeriod(days = week * 7))
+                        val start = maxOf(startDate, end.minus(DatePeriod(days = 6)))
+                        if (start <= endDate && start <= end) chartTypes += AnalyticsUiState.ChartType.Week(start, end)
+                    }
+                }
+
+                AnalyticsUiState.DayRange.LAST_90_DAYS,
+                AnalyticsUiState.DayRange.THIS_YEAR,
+                AnalyticsUiState.DayRange.ALL_TIME -> {
+                    var month = LocalDate(startDate.year, startDate.month.number, 1)
+                    while (month <= endDate) {
+                        chartTypes += AnalyticsUiState.ChartType.Month(month.month, month.year)
+                        month = month.plus(DatePeriod(months = 1))
+                    }
+                }
+
+                AnalyticsUiState.DayRange.THIS_MONTH,
+                AnalyticsUiState.DayRange.CUSTOM_RANGE -> {
+                    val dayCount = (0..60).count { offset ->
+                        startDate.plus(DatePeriod(days = offset)) <= endDate
+                    }
+                    if (dayCount <= 14) {
+                        var day = startDate
+                        while (day <= endDate) {
+                            chartTypes += AnalyticsUiState.ChartType.Day(day)
+                            day = day.plus(DatePeriod(days = 1))
+                        }
+                    } else if (dayCount <= 60) {
+                        var weekStart = startDate
+                        while (weekStart <= endDate) {
+                            val weekEnd = minOf(endDate, weekStart.plus(DatePeriod(days = 6)))
+                            chartTypes += AnalyticsUiState.ChartType.Week(weekStart, weekEnd)
+                            weekStart = weekEnd.plus(DatePeriod(days = 1))
+                        }
+                    } else {
+                        var month = LocalDate(startDate.year, startDate.month.number, 1)
+                        while (month <= endDate) {
+                            chartTypes += AnalyticsUiState.ChartType.Month(month.month, month.year)
+                            month = month.plus(DatePeriod(months = 1))
+                        }
+                    }
+                }
+            }
+
+            val currentTimeZone = TimeZone.currentSystemDefault()
+            val data =
+                chartTypes.map { bucket ->
+                    val bucketStart: LocalDate
+                    val bucketEnd: LocalDate
+                    when (bucket) {
+                        is AnalyticsUiState.ChartType.Day -> {
+                            bucketStart = bucket.day
+                            bucketEnd = bucket.day
+                        }
+                        is AnalyticsUiState.ChartType.Week -> {
+                            bucketStart = bucket.start
+                            bucketEnd = bucket.end
+                        }
+                        is AnalyticsUiState.ChartType.Month -> {
+                            val firstOfMonth = LocalDate(bucket.year, bucket.month.number, 1)
+                            val nextMonth = firstOfMonth.plus(DatePeriod(months = 1))
+                            bucketStart = maxOf(startDate, firstOfMonth)
+                            bucketEnd = minOf(endDate, nextMonth.minus(DatePeriod(days = 1)))
+                        }
+                    }
+                    val startTimestamp =
+                        bucketStart.atStartOfDayIn(currentTimeZone).toLocalDateTime(currentTimeZone)
+                    val endTimestamp =
+                        bucketEnd.plus(DatePeriod(days = 1))
+                            .atStartOfDayIn(currentTimeZone)
+                            .toLocalDateTime(currentTimeZone)
+                    val count =
+                        analyticsRepository.getPlaybackEventCountInRange(
+                            startTimestamp = startTimestamp,
+                            endTimestamp = endTimestamp,
+                        ).lastOrNull() ?: 0L
+                    bucket to count
+                }
+
+            _analyticsUIState.update {
+                it.copy(scrobblesLineChart = LocalResource.Success(data))
+            }
+        }
+    }
+
+"""
+if not chart_pattern.search(analytics_vm):
+    raise SystemExit("Could not isolate AnalyticsViewModel.getScrobblesLineChart.")
+analytics_vm, n = chart_pattern.subn(new_chart, analytics_vm, count=1)
+if n != 1:
+    raise SystemExit("AnalyticsViewModel.getScrobblesLineChart replacement was not unique.")
+
+custom_method = """    fun setCustomRange(
+        start: LocalDate,
+        end: LocalDate,
+    ) {
+        val first = minOf(start, end)
+        val last = maxOf(start, end)
+        _analyticsUIState.update {
+            it.copy(
+                dayRange = AnalyticsUiState.DayRange.CUSTOM_RANGE,
+                periodOffset = 0,
+                customStartDate = first,
+                customEndDate = last,
+            )
+        }
+        loadPeriod()
+    }
+
+"""
+analytics_vm = replace_once(
+    analytics_vm,
+    "    fun setDayRange(dayRange: AnalyticsUiState.DayRange) {\n",
+    custom_method + "    fun setDayRange(dayRange: AnalyticsUiState.DayRange) {\n",
+    "V18 custom date-range setter",
+)
+analytics_vm = replace_once(
+    analytics_vm,
+    "    val periodEnd: LocalDate? = null,\n",
+    "    val periodEnd: LocalDate? = null,\n    val customStartDate: LocalDate? = null,\n    val customEndDate: LocalDate? = null,\n",
+    "V18 custom date-range state",
+)
+analytics_vm = replace_once(
+    analytics_vm,
+    "        LAST_90_DAYS(90),\n\n        /** Length is unused — a year steps by calendar years, see rangeFor. */\n        THIS_YEAR(365),\n",
+    "        LAST_90_DAYS(90),\n        THIS_MONTH(31),\n\n        /** Length is unused — calendar periods are resolved in rangeFor. */\n        THIS_YEAR(365),\n        ALL_TIME(0),\n        CUSTOM_RANGE(0),\n",
+    "V18 Analytics range options",
+)
+(ROOT / analytics_vm_path).write_text(analytics_vm)
+
+# Extend the official 2.7 range pill with month/all-time choices and a native date-range picker.
+analytics_screen_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/analytics/AnalyticsScreen.kt"
+analytics_screen = (ROOT / analytics_screen_path).read_text()
+for imp in (
+    "import androidx.compose.material3.DatePickerDialog\n",
+    "import androidx.compose.material3.DateRangePicker\n",
+    "import androidx.compose.material3.TextButton\n",
+    "import androidx.compose.material3.rememberDateRangePickerState\n",
+    "import kotlinx.datetime.Instant\n",
+    "import kotlinx.datetime.LocalDate\n",
+    "import kotlinx.datetime.TimeZone\n",
+    "import kotlinx.datetime.toLocalDateTime\n",
+    "import simpmusic.composeapp.generated.resources.this_month\n",
+    "import simpmusic.composeapp.generated.resources.all_time\n",
+    "import simpmusic.composeapp.generated.resources.custom_range\n",
+):
+    if imp not in analytics_screen:
+        analytics_screen = replace_once(
+            analytics_screen,
+            "import androidx.compose.material3.DropdownMenuItem\n",
+            "import androidx.compose.material3.DropdownMenuItem\n" + imp if imp.startswith("import androidx.compose.material3") else "import androidx.compose.material3.DropdownMenuItem\n",
+            "V18 Analytics imports",
+        ) if imp.startswith("import androidx.compose.material3") else analytics_screen
+        if not imp.startswith("import androidx.compose.material3"):
+            analytics_screen = replace_once(
+                analytics_screen,
+                "import kotlinx.coroutines.flow.map\n",
+                "import kotlinx.coroutines.flow.map\n" + imp,
+                "V18 Analytics date imports",
+            ) if imp.startswith("import kotlinx.datetime") else replace_once(
+                analytics_screen,
+                "import simpmusic.composeapp.generated.resources.this_year\n",
+                "import simpmusic.composeapp.generated.resources.this_year\n" + imp,
+                "V18 Analytics range resources",
+            )
+
+analytics_screen = replace_once(
+    analytics_screen,
+    "                onPick = { analyticsViewModel.setDayRange(it) },\n",
+    "                onPick = { analyticsViewModel.setDayRange(it) },\n                onCustomRange = { start, end -> analyticsViewModel.setCustomRange(start, end) },\n",
+    "V18 custom range callback",
+)
+pill_pattern = re.compile(r"(?ms)^@Composable\nprivate fun DayRangePill\(.*?(?=^// ========== Header ==========)")
+new_pill = """@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DayRangePill(
+    uiState: AnalyticsUiState,
+    backdrop: PlatformBackdrop,
+    onPick: (AnalyticsUiState.DayRange) -> Unit,
+    onCustomRange: (LocalDate, LocalDate) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    var showCustomRange by rememberSaveable { mutableStateOf(false) }
+    val pickerState = rememberDateRangePickerState()
+    val label =
+        stringResource(
+            when (uiState.dayRange) {
+                AnalyticsUiState.DayRange.LAST_7_DAYS -> Res.string.last_7_days
+                AnalyticsUiState.DayRange.LAST_30_DAYS -> Res.string.last_30_days
+                AnalyticsUiState.DayRange.LAST_90_DAYS -> Res.string.last_90_days
+                AnalyticsUiState.DayRange.THIS_MONTH -> Res.string.this_month
+                AnalyticsUiState.DayRange.THIS_YEAR -> Res.string.this_year
+                AnalyticsUiState.DayRange.ALL_TIME -> Res.string.all_time
+                AnalyticsUiState.DayRange.CUSTOM_RANGE -> Res.string.custom_range
+            },
+        )
+    Box(modifier) {
+        Row(
+            modifier =
+                Modifier
+                    .height(48.dp)
+                    .liquidGlass(backdrop, RoundedCornerShape(24.dp), highlight = Highlight(width = 1.dp))
+                    .clip(RoundedCornerShape(24.dp))
+                    .clickable { expanded = true }
+                    .padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(text = label, style = typo().labelSmall, color = Color.White, maxLines = 1)
+            Icon(
+                imageVector = SimpIcons.KeyboardArrowDown,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            AnalyticsUiState.DayRange.entries.forEach { range ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            stringResource(
+                                when (range) {
+                                    AnalyticsUiState.DayRange.LAST_7_DAYS -> Res.string.last_7_days
+                                    AnalyticsUiState.DayRange.LAST_30_DAYS -> Res.string.last_30_days
+                                    AnalyticsUiState.DayRange.LAST_90_DAYS -> Res.string.last_90_days
+                                    AnalyticsUiState.DayRange.THIS_MONTH -> Res.string.this_month
+                                    AnalyticsUiState.DayRange.THIS_YEAR -> Res.string.this_year
+                                    AnalyticsUiState.DayRange.ALL_TIME -> Res.string.all_time
+                                    AnalyticsUiState.DayRange.CUSTOM_RANGE -> Res.string.custom_range
+                                },
+                            ),
+                            style = typo().labelSmall,
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        if (range == AnalyticsUiState.DayRange.CUSTOM_RANGE) {
+                            showCustomRange = true
+                        } else {
+                            onPick(range)
+                        }
+                    },
+                )
+            }
+        }
+    }
+
+    if (showCustomRange) {
+        DatePickerDialog(
+            onDismissRequest = { showCustomRange = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val startMillis = pickerState.selectedStartDateMillis
+                        val endMillis = pickerState.selectedEndDateMillis
+                        if (startMillis != null && endMillis != null) {
+                            val start = Instant.fromEpochMilliseconds(startMillis).toLocalDateTime(TimeZone.UTC).date
+                            val end = Instant.fromEpochMilliseconds(endMillis).toLocalDateTime(TimeZone.UTC).date
+                            onCustomRange(start, end)
+                            showCustomRange = false
+                        }
+                    },
+                ) { Text("Apply") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCustomRange = false }) { Text("Cancel") }
+            },
+        ) {
+            DateRangePicker(state = pickerState, modifier = Modifier.height(500.dp))
+        }
+    }
+}
+
+"""
+if not pill_pattern.search(analytics_screen):
+    raise SystemExit("Could not isolate official AnalyticsScreen.DayRangePill.")
+analytics_screen, n = pill_pattern.subn(new_pill + "// ========== Header ==========", analytics_screen, count=1)
+if n != 1:
+    raise SystemExit("Official Insights range picker replacement was not unique.")
+(ROOT / analytics_screen_path).write_text(analytics_screen)
+
+# Add localized labels without replacing any existing resource entries.
+strings_path = "composeApp/src/commonMain/composeResources/values/strings.xml"
+strings = (ROOT / strings_path).read_text()
+new_strings = {
+    "this_month": "This month",
+    "all_time": "All time",
+    "custom_range": "Custom range",
+}
+additions = []
+for key, value in new_strings.items():
+    if not re.search(r'<string\s+name="' + re.escape(key) + r'"(?:\s|>)', strings):
+        additions.append(f'    <string name="{key}">{value}</string>')
+if additions:
+    strings = replace_once(strings, "</resources>", "\n".join(additions) + "\n</resources>", "V18 Insights period labels")
+    (ROOT / strings_path).write_text(strings)
+
+# Validate every new enum value is handled by both the view model and the official range picker.
+for marker in ("THIS_MONTH", "ALL_TIME", "CUSTOM_RANGE", "fun setCustomRange("):
+    if marker not in analytics_vm:
+        raise SystemExit(f"V18 AnalyticsViewModel filter is missing: {marker}")
+for marker in ("DayRange.THIS_MONTH", "DayRange.ALL_TIME", "DayRange.CUSTOM_RANGE", "onCustomRange"):
+    if marker not in analytics_screen:
+        raise SystemExit(f"V18 official Insights UI filter is missing: {marker}")
+print("V18 custom Insights filters applied: this month, this year, all-time and custom date range.")
