@@ -94,7 +94,8 @@ if "AppIconLiquidGlass" not in manifest:
     if start < 0 or end < 0:
         raise SystemExit("Could not isolate official app-icon activity aliases.")
     aliases = official_manifest[start:end]
-    manifest = replace_once(manifest, "        <provider", aliases + "        <provider", "App icon manifest aliases")
+    provider_anchor = '        <provider\n            android:name="androidx.startup.InitializationProvider"'
+    manifest = replace_once(manifest, provider_anchor, aliases + provider_anchor, "App icon manifest aliases")
     (ROOT / manifest_path).write_text(manifest)
 
 # Import the small set of app-icon strings, plus the Settings search placeholder.
