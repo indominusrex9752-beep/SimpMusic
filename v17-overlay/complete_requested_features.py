@@ -48,6 +48,7 @@ icon_paths = [
     p for p in listed
     if re.search(r"androidApp/src/main/res/(mipmap-[^/]+/ic_launcher_(old_school|minimalism_light|minimalism_dark|pixel)(?:_foreground)?\.(?:xml|webp)|drawable/ic_launcher_pixel_foreground\.xml)$", p)
     or re.search(r"composeApp/src/commonMain/composeResources/drawable/app_icon_option_.*\.png$", p)
+    or p == "androidApp/src/main/res/values/app_icon_colors.xml"
 ]
 if not any("ic_launcher_old_school" in p for p in icon_paths):
     raise SystemExit("Official selectable launcher icon resources were not found.")
