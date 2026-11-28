@@ -145,7 +145,9 @@ def remove_kotlin_block(source: str, start_pattern: str, label: str) -> str:
     match = re.search(start_pattern, source, re.MULTILINE)
     if not match:
         return source
-    opening = source.find("{", match.end())
+    opening = source.find("{", match.start(), match.end())
+    if opening < 0:
+        opening = source.find("{", match.end())
     if opening < 0:
         raise SystemExit(f"{label}: opening brace not found")
     depth = 0
