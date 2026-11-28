@@ -1305,11 +1305,11 @@ analytics_screen = replace_once(
 )
 analytics_screen = replace_once(
     analytics_screen,
-    "                AnalyticsUiState.DayRange.CUSTOM_RANGE -> Res.string.custom_range\n",
-    """                AnalyticsUiState.DayRange.CUSTOM_RANGE -> Res.string.custom_range
-                AnalyticsUiState.DayRange.SPECIFIC_DAY -> Res.string.specific_day
-                AnalyticsUiState.DayRange.SPECIFIC_MONTH -> Res.string.specific_month
-                AnalyticsUiState.DayRange.SPECIFIC_YEAR -> Res.string.specific_year
+    "                                    AnalyticsUiState.DayRange.CUSTOM_RANGE -> Res.string.custom_range\n",
+    """                                    AnalyticsUiState.DayRange.CUSTOM_RANGE -> Res.string.custom_range
+                                    AnalyticsUiState.DayRange.SPECIFIC_DAY -> Res.string.specific_day
+                                    AnalyticsUiState.DayRange.SPECIFIC_MONTH -> Res.string.specific_month
+                                    AnalyticsUiState.DayRange.SPECIFIC_YEAR -> Res.string.specific_year
 """,
     "V18 specific filter menu labels",
 )
