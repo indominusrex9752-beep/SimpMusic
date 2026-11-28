@@ -159,8 +159,6 @@ resource_keys = (
     "create_radio_description",
     "delete_lyrics",
     "delete_lyrics_confirm",
-    "replay_mix",
-    "replay_mix_subtitle",
 )
 def add_selected_resources(source: str) -> str:
     additions = []
