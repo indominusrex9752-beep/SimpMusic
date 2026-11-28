@@ -1362,9 +1362,7 @@ if additions:
 analytics_screen_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/analytics/AnalyticsScreen.kt"
 analytics_screen = (ROOT / analytics_screen_path).read_text()
 for anchor, addition, label in (
-    ("import androidx.compose.material3.DatePickerDialog\n", "import androidx.compose.material3.AlertDialog\n", "V18 selector AlertDialog import"),
-    ("import androidx.compose.material3.TextButton\n", "import androidx.compose.material3.OutlinedTextField\n", "V18 custom date text-field import"),
-    ("import androidx.compose.material3.TextButton\n", "import androidx.compose.material3.AlertDialog\n", "V18 selector TextButton import"),
+    ("import androidx.compose.material3.Text\n", "import androidx.compose.material3.AlertDialog\nimport androidx.compose.material3.TextButton\nimport androidx.compose.material3.OutlinedTextField\n", "V18 compatible date dialog and text-field imports"),
     ("import androidx.compose.runtime.mutableStateOf\n", "import androidx.compose.runtime.mutableIntStateOf\n", "V18 month/year selector state import"),
     ("import simpmusic.composeapp.generated.resources.custom_range\n", "import simpmusic.composeapp.generated.resources.specific_day\nimport simpmusic.composeapp.generated.resources.specific_month\nimport simpmusic.composeapp.generated.resources.specific_year\n", "V18 specific period label imports"),
 ):
