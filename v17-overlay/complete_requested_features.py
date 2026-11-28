@@ -1216,11 +1216,17 @@ analytics_vm = replace_once(
 """,
     "V18 specific date selection handler",
 )
-analytics_vm = replace_once(
+state_class_match = re.search(
+    r"(?ms)(data class AnalyticsUiState\\s*\\(.*?)(^    val customEndDate: LocalDate\\? = null,$)",
     analytics_vm,
-    "    val customEndDate: LocalDate? = null,\n",
-    "    val customEndDate: LocalDate? = null,\n    val specificPeriodDate: LocalDate? = null,\n",
-    "V18 selected specific date state",
+)
+if not state_class_match:
+    raise SystemExit("V18 selected specific date state: could not find AnalyticsUiState.customEndDate.")
+analytics_vm = (
+    analytics_vm[:state_class_match.start()]
+    + state_class_match.group(1)
+    + "    val customEndDate: LocalDate? = null,\\n    val specificPeriodDate: LocalDate? = null,"
+    + analytics_vm[state_class_match.end():]
 )
 analytics_vm = replace_once(
     analytics_vm,
