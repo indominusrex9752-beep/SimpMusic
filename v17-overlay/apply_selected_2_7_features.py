@@ -186,10 +186,13 @@ def strip_replay_mix():
         "",
         dynamic,
     )
+    # The select-all branch is formatted differently from the regular playlist branch.
+    # Match its indentation and expression independently, including the following map line.
     dynamic = re.sub(
-        r"                                LibraryDynamicPlaylistType\.ReplayMix ->\n                                    \(if \(query\.isNotEmpty\(\) && showSearchBar\) tempReplayMix else replayMix\)\n                                        \.map \{ it\.videoId \}\n",
+        r"^[ \\t]*LibraryDynamicPlaylistType\\.ReplayMix ->\\n[ \\t]*\\(if .*?tempReplayMix.*?replayMix\\)\\n[ \\t]*\\.map \\{ it\\.videoId \\}\\n",
         "",
         dynamic,
+        flags=re.MULTILINE,
     )
     dynamic = re.sub(
         r"    /\*\*\n     \* The local Replay Mix:.*?\n    data object ReplayMix : LibraryDynamicPlaylistType\(\)\n\n",
