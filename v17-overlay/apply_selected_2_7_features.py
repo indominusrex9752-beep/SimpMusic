@@ -189,7 +189,7 @@ def strip_replay_mix():
     # The select-all branch is formatted differently from the regular playlist branch.
     # Match its indentation and expression independently, including the following map line.
     dynamic = re.sub(
-        r"^[ \\t]*LibraryDynamicPlaylistType\\.ReplayMix ->\\n[ \\t]*\\(if .*?tempReplayMix.*?replayMix\\)\\n[ \\t]*\\.map \\{ it\\.videoId \\}\\n",
+        r"^[ \t]*LibraryDynamicPlaylistType\.ReplayMix ->\n[ \t]*\(if .*?tempReplayMix.*?replayMix\)\n[ \t]*\.map \{ it\.videoId \}\n",
         "",
         dynamic,
         flags=re.MULTILINE,
