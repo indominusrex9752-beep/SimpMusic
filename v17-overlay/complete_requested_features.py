@@ -1044,7 +1044,7 @@ print("V18 custom Insights filters applied: this month, this year, all-time and 
 # Keep the custom Insights period-label helper exhaustive after extending DayRange.
 analytics_format_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/analytics/AnalyticsFormat.kt"
 analytics_format = (ROOT / analytics_format_path).read_text()
-format_anchor = "        AnalyticsUiState.DayRange.THIS_YEAR -> Res.string.this_year\\n"
+format_anchor = "        AnalyticsUiState.DayRange.THIS_YEAR -> Res.string.this_year\n"
 format_addition = """        AnalyticsUiState.DayRange.THIS_MONTH -> Res.string.this_month
         AnalyticsUiState.DayRange.ALL_TIME -> Res.string.all_time
         AnalyticsUiState.DayRange.CUSTOM_RANGE -> Res.string.custom_range
