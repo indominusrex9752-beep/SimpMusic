@@ -1228,12 +1228,8 @@ analytics_vm = (
     + "    val customEndDate: LocalDate? = null,\n    val specificPeriodDate: LocalDate? = null,"
     + analytics_vm[state_class_match.end():]
 )
-analytics_vm = replace_once(
-    analytics_vm,
-    "        CUSTOM_RANGE(0),\n",
-    "        CUSTOM_RANGE(0),\n        SPECIFIC_DAY(1),\n        SPECIFIC_MONTH(31),\n        SPECIFIC_YEAR(365),\n",
-    "V18 specific period enum values",
-)
+# DayRange was already extended structurally above. Do not apply a second
+# text-based enum insertion: the enum formatting differs across Insights bases.
 (ROOT / analytics_vm_path).write_text(analytics_vm)
 
 # Add localized menu labels.
