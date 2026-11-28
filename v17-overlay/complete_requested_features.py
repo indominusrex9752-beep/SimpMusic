@@ -199,6 +199,34 @@ if "val appIcon = remember { currentAppIcon() }" not in settings:
 
 (ROOT / settings_path).write_text(settings)
 
+# The animated-lyrics preference must remain visible on Android 9-11 even though its
+# blurred artwork effect is only rendered on Android 12+ (rememberAnimatedLyricsBackground
+# enforces the platform capability). Keep the style picker and bass-pulse controls gated.
+lyrics_old = """                            // Same Android 12 gate as the style above: the background is a blur too, and without
+                            // one it would show four turning squares of artwork.
+                            SettingItem(
+                                title = stringResource(Res.string.animated_lyrics_background),
+                                subtitle = stringResource(Res.string.animated_lyrics_background_description),
+                                switch = (animatedLyricsBackground to { viewModel.setAnimatedLyricsBackground(it) }),
+                            )
+"""
+lyrics_new = """                        }
+                        SettingItem(
+                            title = stringResource(Res.string.animated_lyrics_background),
+                            subtitle = stringResource(Res.string.animated_lyrics_background_description) +
+                                if (isLyricsBlurSupported()) "" else requiresAndroid12,
+                            switch = (animatedLyricsBackground to { viewModel.setAnimatedLyricsBackground(it) }),
+                        )
+                        if (isLyricsBlurSupported()) {
+"""
+if "title = stringResource(Res.string.animated_lyrics_background)" not in settings:
+    raise SystemExit("Animated lyrics preference anchor disappeared.")
+if lyrics_old in settings:
+    settings = replace_once(settings, lyrics_old, lyrics_new, "Show animated lyrics option on every Android version")
+elif 'subtitle = stringResource(Res.string.animated_lyrics_background_description) +' not in settings:
+    raise SystemExit("Could not safely move the animated lyrics option outside the Android 12 gate.")
+(ROOT / settings_path).write_text(settings)
+
 # Guard against silently shipping a partial implementation.
 checks = {
     settings_path: ("SearchTextField(", "CompositionLocalProvider(LocalSettingSearch provides searchText)", "currentAppIcon()", "setAppIcon(style)"),
