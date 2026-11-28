@@ -225,6 +225,10 @@ if lyrics_old in settings:
     settings = replace_once(settings, lyrics_old, lyrics_new, "Show animated lyrics option on every Android version")
 elif 'subtitle = stringResource(Res.string.animated_lyrics_background_description) +' not in settings:
     raise SystemExit("Could not safely move the animated lyrics option outside the Android 12 gate.")
+animated_row = settings.index("title = stringResource(Res.string.animated_lyrics_background)")
+lyrics_gate = settings.rfind("if (isLyricsBlurSupported())", 0, animated_row)
+if lyrics_gate >= 0:
+    raise SystemExit("Animated lyrics preference is still nested inside the Android 12-only section.")
 (ROOT / settings_path).write_text(settings)
 
 # Guard against silently shipping a partial implementation.
