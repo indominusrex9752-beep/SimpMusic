@@ -261,6 +261,12 @@ if lyrics_gate >= 0 and "\n                    }\n\n" not in settings[lyrics_gat
     raise SystemExit("Animated lyrics preference is still nested inside the Android 12-only section.")
 if "requiresAndroid12" not in settings[animated_row:animated_row + 500]:
     raise SystemExit("Animated lyrics option does not explain the Android 12 effect requirement.")
+# The two alert-state values are checked immediately above, but delegated Compose state is not
+# smart-cast by Kotlin. Use non-null assertions inside those guarded branches instead of return.
+settings = settings.replace("val alertBasicState = basisAlertData ?: return", "val alertBasicState = basisAlertData!!")
+settings = settings.replace("val alertState = alertData ?: return", "val alertState = alertData!!")
+if "basisAlertData ?: return" in settings or "alertData ?: return" in settings:
+    raise SystemExit("Illegal early return remains in Settings alert rendering.")
 (ROOT / settings_path).write_text(settings)
 
 # Guard against silently shipping a partial implementation.
