@@ -818,7 +818,7 @@ analytics_vm = replace_once(
 # The Insights archive and official 2.7 source use different comments/spacing here.
 # Extend the actual enum structurally, adding only missing values.
 day_range_enum = re.compile(
-    r"(?ms)(enum class DayRange\\s*\\(\\s*val lengthInDays:\\s*Int\\s*,?\\s*\\)\\s*\\{)(.*?)(^\\s*\\})"
+    r"(?ms)(enum class DayRange\s*\(\s*val lengthInDays:\s*Int\s*,?\s*\)\s*\{)(.*?)(^\s*\})"
 )
 enum_match = day_range_enum.search(analytics_vm)
 if not enum_match:
@@ -835,13 +835,13 @@ required_ranges = (
 missing_ranges = [
     f"        {name}({length})"
     for name, length in required_ranges
-    if not re.search(rf"(?m)^\\s*{name}\\s*\\(", enum_body)
+    if not re.search(rf"(?m)^\s*{name}\s*\(", enum_body)
 ]
 if missing_ranges:
     body = enum_body.rstrip()
     if body and not body.endswith(","):
         body += ","
-    body += "\\n" + ",\\n".join(missing_ranges) + ",\\n"
+    body += "\n" + ",\n".join(missing_ranges) + ",\n"
     analytics_vm = (
         analytics_vm[:enum_match.start(2)]
         + body
