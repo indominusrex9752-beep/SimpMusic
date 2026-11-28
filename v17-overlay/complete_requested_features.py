@@ -46,8 +46,8 @@ for path in (
 listed = git_bytes("ls-tree", "-r", "--name-only", UPGRADE, "--", "androidApp/src/main/res", "composeApp/src/commonMain/composeResources/drawable").decode().splitlines()
 icon_paths = [
     p for p in listed
-    if re.search(r"androidApp/src/main/res/(mipmap-[^/]+/ic_launcher_(old_school|minimalism_light|minimalism_dark|pixel)(?:_foreground)?\\.(?:xml|webp)|drawable/ic_launcher_pixel_foreground\\.xml)$", p)
-    or re.search(r"composeApp/src/commonMain/composeResources/drawable/app_icon_option_.*\\.png$", p)
+    if re.search(r"androidApp/src/main/res/(mipmap-[^/]+/ic_launcher_(old_school|minimalism_light|minimalism_dark|pixel)(?:_foreground)?\.(?:xml|webp)|drawable/ic_launcher_pixel_foreground\.xml)$", p)
+    or re.search(r"composeApp/src/commonMain/composeResources/drawable/app_icon_option_.*\.png$", p)
 ]
 if not any("ic_launcher_old_school" in p for p in icon_paths):
     raise SystemExit("Official selectable launcher icon resources were not found.")
@@ -79,37 +79,37 @@ keys = (
 )
 additions = []
 for key in keys:
-    matches = re.findall(r'<string\\s+name="' + re.escape(key) + r'"[^>]*>.*?</string>', official_strings, re.DOTALL)
+    matches = re.findall(r'<string\s+name="' + re.escape(key) + r'"[^>]*>.*?</string>', official_strings, re.DOTALL)
     if len(matches) != 1:
         raise SystemExit(f"Expected one official string resource for {key}, found {len(matches)}")
-    if not re.search(r'<string\\s+name="' + re.escape(key) + r'"(?:\\s|>)', strings):
+    if not re.search(r'<string\s+name="' + re.escape(key) + r'"(?:\s|>)', strings):
         additions.append("    " + matches[0].strip())
 if additions:
-    strings = replace_once(strings, "</resources>", "\\n".join(additions) + "\\n</resources>", "App icon and Settings search resources")
+    strings = replace_once(strings, "</resources>", "\n".join(additions) + "\n</resources>", "App icon and Settings search resources")
     (ROOT / strings_path).write_text(strings)
 
 settings_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt"
 settings = (ROOT / settings_path).read_text()
 # Add imports without importing the official SettingsViewModel (which contains excluded AI settings).
-import_anchor = "import androidx.compose.runtime.Composable\\n"
+import_anchor = "import androidx.compose.runtime.Composable\n"
 imports = (
-    "import androidx.compose.runtime.CompositionLocalProvider\\n"
-    "import com.maxrave.simpmusic.expect.AppIconStyle\\n"
-    "import com.maxrave.simpmusic.expect.currentAppIcon\\n"
-    "import com.maxrave.simpmusic.expect.setAppIcon\\n"
-    "import com.maxrave.simpmusic.ui.component.LocalSettingSearch\\n"
-    "import com.maxrave.simpmusic.ui.component.SearchTextField\\n"
-    "import com.maxrave.simpmusic.ui.component.SettingGroupShape\\n"
-    "import com.maxrave.simpmusic.ui.component.settingGroupBackground\\n"
-    "import com.maxrave.simpmusic.ui.component.searchKey\\n"
-    "import simpmusic.composeapp.generated.resources.search_settings\\n"
-    "import simpmusic.composeapp.generated.resources.app_icon_title\\n"
-    "import simpmusic.composeapp.generated.resources.app_icon_liquid_glass\\n"
-    "import simpmusic.composeapp.generated.resources.app_icon_old_school\\n"
-    "import simpmusic.composeapp.generated.resources.app_icon_minimalism_light\\n"
-    "import simpmusic.composeapp.generated.resources.app_icon_minimalism_dark\\n"
-    "import simpmusic.composeapp.generated.resources.app_icon_pixel\\n"
-    "import simpmusic.composeapp.generated.resources.app_icon_close_warning\\n"
+    "import androidx.compose.runtime.CompositionLocalProvider\n"
+    "import com.maxrave.simpmusic.expect.AppIconStyle\n"
+    "import com.maxrave.simpmusic.expect.currentAppIcon\n"
+    "import com.maxrave.simpmusic.expect.setAppIcon\n"
+    "import com.maxrave.simpmusic.ui.component.LocalSettingSearch\n"
+    "import com.maxrave.simpmusic.ui.component.SearchTextField\n"
+    "import com.maxrave.simpmusic.ui.component.SettingGroupShape\n"
+    "import com.maxrave.simpmusic.ui.component.settingGroupBackground\n"
+    "import com.maxrave.simpmusic.ui.component.searchKey\n"
+    "import simpmusic.composeapp.generated.resources.search_settings\n"
+    "import simpmusic.composeapp.generated.resources.app_icon_title\n"
+    "import simpmusic.composeapp.generated.resources.app_icon_liquid_glass\n"
+    "import simpmusic.composeapp.generated.resources.app_icon_old_school\n"
+    "import simpmusic.composeapp.generated.resources.app_icon_minimalism_light\n"
+    "import simpmusic.composeapp.generated.resources.app_icon_minimalism_dark\n"
+    "import simpmusic.composeapp.generated.resources.app_icon_pixel\n"
+    "import simpmusic.composeapp.generated.resources.app_icon_close_warning\n"
 )
 for line in imports.splitlines(True):
     if line.strip() not in settings:
@@ -117,28 +117,28 @@ for line in imports.splitlines(True):
 
 # Search is a screen-level query propagated to setting rows and groups. This retains every
 # existing V17 row, including Google OAuth/Supabase controls, and filters rather than replacing it.
-state_anchor = "    val settingListState = rememberLazyListState()\\n"
+state_anchor = "    val settingListState = rememberLazyListState()\n"
 state_add = (
-    "    var searchQuery by rememberSaveable { mutableStateOf(\\\"\\\") }\\n"
-    "    val searchText = remember(searchQuery) { searchKey(searchQuery.trim()) }\\n"
+    "    var searchQuery by rememberSaveable { mutableStateOf(\\"\\") }\n"
+    "    val searchText = remember(searchQuery) { searchKey(searchQuery.trim()) }\n"
 )
 if "var searchQuery by rememberSaveable" not in settings:
     settings = replace_once(settings, state_anchor, state_anchor + state_add, "Settings search state")
-list_anchor = "    LazyColumn(\\n        state = settingListState,"
+list_anchor = "    LazyColumn(\n        state = settingListState,"
 if "CompositionLocalProvider(LocalSettingSearch provides searchText)" not in settings:
-    settings = replace_once(settings, list_anchor, "    CompositionLocalProvider(LocalSettingSearch provides searchText) {\\n" + list_anchor, "Settings search provider")
+    settings = replace_once(settings, list_anchor, "    CompositionLocalProvider(LocalSettingSearch provides searchText) {\n" + list_anchor, "Settings search provider")
     close_anchor = "    // The pinned copy of the toolbar, frosted:"
-    settings = replace_once(settings, close_anchor, "    }\\n\\n" + close_anchor, "Settings search provider closing")
-search_anchor = "                // Above every section, and inside item 0 rather than an item of its own, for the glow reason above.\\n"
+    settings = replace_once(settings, close_anchor, "    }\n\n" + close_anchor, "Settings search provider closing")
+search_anchor = "                // Above every section, and inside item 0 rather than an item of its own, for the glow reason above.\n"
 search_ui = (
-    "                SearchTextField(\\n"
-    "                    query = searchQuery,\\n"
-    "                    onQueryChange = { searchQuery = it },\\n"
-    "                    placeholder = stringResource(Res.string.search_settings),\\n"
-    "                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),\\n"
-    "                    shape = SettingGroupShape,\\n"
-    "                    containerColor = settingGroupBackground(),\\n"
-    "                )\\n"
+    "                SearchTextField(\n"
+    "                    query = searchQuery,\n"
+    "                    onQueryChange = { searchQuery = it },\n"
+    "                    placeholder = stringResource(Res.string.search_settings),\n"
+    "                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),\n"
+    "                    shape = SettingGroupShape,\n"
+    "                    containerColor = settingGroupBackground(),\n"
+    "                )\n"
 )
 if "placeholder = stringResource(Res.string.search_settings)" not in settings:
     settings = replace_once(settings, search_anchor, search_ui + search_anchor, "Settings search field")
