@@ -282,3 +282,282 @@ for path, markers in checks.items():
             raise SystemExit(f"Requested V17 feature wiring missing from {path}: {marker}")
 
 print("V17 requested-feature integration: Settings search and Android app icon chooser wired.")
+
+
+# V18 refinement: restore the official 2.7 Insights presentation after the custom archive merge.
+# The custom AnalyticsViewModel and its playback-event repository remain in place.
+copy_text("composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/analytics/AnalyticsScreen.kt")
+
+# V18 refinement: restore the official app-icon preview thumbnails in the existing chooser.
+settings_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/SettingScreen.kt"
+settings = (ROOT / settings_path).read_text()
+old_icon_options = """                        val options = listOf(
+                            AppIconStyle.LIQUID_GLASS to stringResource(Res.string.app_icon_liquid_glass),
+                            AppIconStyle.OLD_SCHOOL to stringResource(Res.string.app_icon_old_school),
+                            AppIconStyle.MINIMALISM_LIGHT to stringResource(Res.string.app_icon_minimalism_light),
+                            AppIconStyle.MINIMALISM_DARK to stringResource(Res.string.app_icon_minimalism_dark),
+                            AppIconStyle.PIXEL to stringResource(Res.string.app_icon_pixel),
+                        )
+"""
+new_icon_options = """                        val options = listOf(
+                            Triple(AppIconStyle.LIQUID_GLASS, stringResource(Res.string.app_icon_liquid_glass), Res.drawable.app_icon_option_liquid_glass),
+                            Triple(AppIconStyle.OLD_SCHOOL, stringResource(Res.string.app_icon_old_school), Res.drawable.app_icon_option_old_school),
+                            Triple(AppIconStyle.MINIMALISM_LIGHT, stringResource(Res.string.app_icon_minimalism_light), Res.drawable.app_icon_option_minimalism_light),
+                            Triple(AppIconStyle.MINIMALISM_DARK, stringResource(Res.string.app_icon_minimalism_dark), Res.drawable.app_icon_option_minimalism_dark),
+                            Triple(AppIconStyle.PIXEL, stringResource(Res.string.app_icon_pixel), Res.drawable.app_icon_option_pixel),
+                        )
+"""
+if old_icon_options in settings:
+    settings = replace_once(settings, old_icon_options, new_icon_options, "V18 app icon preview options")
+elif new_icon_options not in settings:
+    raise SystemExit("Could not find the V17 app-icon chooser options to restore previews.")
+preview_anchor = "                                            listSelect = options.map { (it.first == current) to it.second },\n"
+preview_value = preview_anchor + "                                            icons = options.map { it.third },\n"
+if preview_value not in settings:
+    settings = replace_once(settings, preview_anchor, preview_value, "V18 app icon preview thumbnails")
+(ROOT / settings_path).write_text(settings)
+
+# V18 refinement: make Home's primary feed independent of mood, chart and new-release requests.
+# The previous combine() withheld the home shelves until all four sources emitted at least once.
+home_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/HomeViewModel.kt"
+home_source = (ROOT / home_path).read_text()
+home_start = home_source.find("    fun getHomeItemList(params: String? = null) {")
+home_end = home_source.find("    /** A shelf's \"Play all\":", home_start)
+if home_start < 0 or home_end < 0:
+    raise SystemExit("Could not isolate HomeViewModel.getHomeItemList for the V18 startup fix.")
+new_home_method = """    fun getHomeItemList(params: String? = null) {
+        loading.value = true
+        _homeListState.value = ListState.LOADING
+        language =
+            runBlocking {
+                dataStoreManager.getString(SELECTED_LANGUAGE).first()
+                    ?: SUPPORTED_LANGUAGE.codes.first()
+            }
+        regionCode = runBlocking { dataStoreManager.location.first() }
+        homeJob?.cancel()
+        homeJob =
+            viewModelScope.launch {
+                regionCodeChart.value = dataStoreManager.chartKey.first()
+
+                // The home feed is the critical path. Do not make its first render wait for
+                // recommendations, charts or new releases, which are independent requests.
+                launch {
+                    homeRepository.getHomeData(
+                        params,
+                        getString(Res.string.view_count),
+                        getString(Res.string.song),
+                    ).collect { home ->
+                        when (home) {
+                            is Resource.Success -> {
+                                _continuation.value = home.data?.first
+                                _homeItemList.value = home.data?.second ?: emptyList()
+                                _homeBackground.value = home.data?.third
+                                _homeListState.value =
+                                    if (_continuation.value.isNullOrEmpty()) {
+                                        ListState.PAGINATION_EXHAUST
+                                    } else {
+                                        ListState.IDLE
+                                    }
+                                loading.value = false
+                                if (dataStoreManager.cookie.first().isNotBlank()) {
+                                    _accountInfo.emit(
+                                        Pair(
+                                            dataStoreManager.getString("AccountName").first(),
+                                            dataStoreManager.getString("AccountThumbUrl").first(),
+                                        ),
+                                    )
+                                }
+                            }
+
+                            is Resource.Error -> {
+                                _continuation.value = null
+                                _homeItemList.value = emptyList()
+                                _homeBackground.value = null
+                                _homeListState.value = ListState.PAGINATION_EXHAUST
+                                loading.value = false
+                                showSnackBarErrorState.emit(home.message)
+                                Logger.w("HomeViewModel", "getHomeItemList: \${home.message}")
+                            }
+
+                            else -> Unit
+                        }
+                    }
+                }
+
+                launch {
+                    homeRepository.getMoodAndMomentsData().collect { mood ->
+                        when (mood) {
+                            is Resource.Success -> _exploreMoodItem.value = mood.data
+                            is Resource.Error -> {
+                                _exploreMoodItem.value = null
+                                showSnackBarErrorState.emit(mood.message)
+                            }
+                            else -> Unit
+                        }
+                    }
+                }
+
+                launch {
+                    homeRepository.getChartData(dataStoreManager.chartKey.first()).collect { chart ->
+                        when (chart) {
+                            is Resource.Success -> _chart.value = chart.data
+                            is Resource.Error -> {
+                                _chart.value = null
+                                showSnackBarErrorState.emit(chart.message)
+                            }
+                            else -> Unit
+                        }
+                    }
+                }
+
+                launch {
+                    homeRepository.getNewRelease(
+                        getString(Res.string.new_release),
+                        getString(Res.string.music_video),
+                    ).collect { newRelease ->
+                        when (newRelease) {
+                            is Resource.Success -> _newRelease.value = newRelease.data ?: emptyList()
+                            is Resource.Error -> _newRelease.value = emptyList()
+                            else -> Unit
+                        }
+                    }
+                }
+            }
+    }
+
+"""
+home_source = home_source[:home_start] + new_home_method + home_source[home_end:]
+(ROOT / home_path).write_text(home_source)
+
+# V18 refinement: prefer YouTube's native shuffle endpoint, even when the parser omitted it.
+# Keep the complete-playlist shuffle as a fallback when that endpoint cannot return tracks.
+playlist_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/PlaylistViewModel.kt"
+playlist_source = (ROOT / playlist_path).read_text()
+if "import com.maxrave.domain.data.model.streams.YouTubeWatchEndpoint\n" not in playlist_source:
+    playlist_source = replace_once(
+        playlist_source,
+        "import com.maxrave.domain.data.model.browse.playlist.PlaylistState\n",
+        "import com.maxrave.domain.data.model.browse.playlist.PlaylistState\nimport com.maxrave.domain.data.model.streams.YouTubeWatchEndpoint\n",
+        "V18 synthetic shuffle endpoint import",
+    )
+
+shuffle_start = re.search(
+    r"(?ms)^            PlaylistUIEvent\.Shuffle -> \{.*?(?=^            PlaylistUIEvent\.StartRadio -> \{)",
+    playlist_source,
+)
+if not shuffle_start:
+    raise SystemExit("Could not isolate PlaylistUIEvent.Shuffle for the V18 endpoint-first fix.")
+
+new_shuffle_branch = """            PlaylistUIEvent.Shuffle -> {
+                val playlistId = data.id.removePrefix("VL")
+                val shuffleEndpoint =
+                    data.shuffleEndpoint
+                        ?: YouTubeWatchEndpoint(
+                            playlistId = playlistId,
+                            params = if (playlistId.startsWith("RD")) RADIO_SHUFFLE_PARAMS else SHUFFLE_PARAMS,
+                        )
+
+                viewModelScope.launch {
+                    // The official 2.7 path is fast because YouTube returns a shuffled queue.
+                    // Try that first; only enumerate every page if the endpoint is unavailable.
+                    val endpointResult =
+                        songRepository
+                            .getRadioFromEndpoint(shuffleEndpoint)
+                            .firstOrNull { it !is Resource.Loading }
+                    val endpointData = (endpointResult as? Resource.Success)?.data
+                    val endpointTracks = endpointData?.first.orEmpty()
+                    val endpointFirst = endpointTracks.firstOrNull()
+
+                    if (endpointFirst != null) {
+                        setQueueData(
+                            QueueData.Data(
+                                listTracks = endpointTracks.toCollection(arrayListOf<Track>()),
+                                firstPlayedTrack = endpointFirst,
+                                playlistId = shuffleEndpoint.playlistId,
+                                playlistName = "\\\\"\${data.title}\\\\" \${getString(Res.string.shuffle)}",
+                                playlistType = PlaylistType.RADIO,
+                                continuation = endpointData?.second,
+                            ),
+                        )
+                        loadMediaItem(endpointFirst, Config.RADIO_CLICK, 0)
+                        Logger.d(tag, "Native shuffle endpoint successful: \${endpointTracks.size} tracks")
+                        return@launch
+                    }
+
+                    try {
+                        val allTracks = tracks.value.toMutableList()
+                        val visitedContinuations = mutableSetOf<String>()
+                        var nextContinuation = continuation.value
+
+                        while (!nextContinuation.isNullOrEmpty()) {
+                            if (!visitedContinuations.add(nextContinuation)) {
+                                throw IllegalStateException("Repeated playlist continuation token")
+                            }
+
+                            val page =
+                                songRepository
+                                    .getContinueTrack(
+                                        data.id,
+                                        nextContinuation,
+                                        fromPlaylist = true,
+                                    ).firstOrNull()
+                                    ?: throw IllegalStateException("Unable to load the next playlist page")
+
+                            val pageTracks =
+                                page.first
+                                    ?: throw IllegalStateException("Playlist page returned no track data")
+
+                            allTracks.addAll(pageTracks)
+                            nextContinuation = page.second
+                        }
+
+                        if (allTracks.isEmpty()) {
+                            makeToast(getString(Res.string.playlist_is_empty))
+                            return@launch
+                        }
+
+                        _tracks.value = allTracks
+                        _continuation.value = null
+                        _tracksListState.value = ListState.PAGINATION_EXHAUST
+
+                        val shuffledTracks = allTracks.shuffled()
+                        val firstTrack = shuffledTracks.first()
+                        setQueueData(
+                            QueueData.Data(
+                                listTracks = shuffledTracks.toCollection(arrayListOf<Track>()),
+                                firstPlayedTrack = firstTrack,
+                                playlistId = data.id,
+                                playlistName = "\\\\"\${data.title}\\\\" \${getString(Res.string.shuffle)}",
+                                playlistType = PlaylistType.PLAYLIST,
+                                continuation = null,
+                            ),
+                        )
+                        loadMediaItem(firstTrack, Config.PLAYLIST_CLICK, 0)
+                        Logger.d(tag, "Full playlist shuffle fallback successful: \${shuffledTracks.size} tracks")
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Logger.w(tag, "Full playlist shuffle fallback failed: \${e.message}")
+                        makeToast("Couldn't load the complete playlist. Please try again.")
+                    }
+                }
+            }
+
+"""
+playlist_source = playlist_source[:shuffle_start.start()] + new_shuffle_branch + playlist_source[shuffle_start.end():]
+if "private const val SHUFFLE_PARAMS = " not in playlist_source:
+    playlist_source += """
+// The params YouTube puts on a Shuffle button for normal playlists and radio mixes.
+private const val SHUFFLE_PARAMS = "wAEB8gECKAE%3D"
+private const val RADIO_SHUFFLE_PARAMS = "wAEB8gECGAE%3D"
+"""
+(ROOT / playlist_path).write_text(playlist_source)
+
+# Fail the build early if any of the V18 refinements were omitted.
+if "icons = options.map { it.third }" not in settings:
+    raise SystemExit("App icon preview thumbnails are not connected.")
+if "homeRepository.getHomeData(" not in home_source or "homeRepository.getMoodAndMomentsData()" not in home_source:
+    raise SystemExit("Independent home feed loading is incomplete.")
+if "YouTubeWatchEndpoint(" not in playlist_source or "Full playlist shuffle fallback successful" not in playlist_source:
+    raise SystemExit("Endpoint-first shuffle or the complete-playlist fallback is missing.")
+print("V18 refinements applied: native-first shuffle, independent home loading, official Insights UI and icon previews.")
