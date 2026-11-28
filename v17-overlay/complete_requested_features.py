@@ -1093,13 +1093,13 @@ analytics_vm_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/view
 analytics_vm = (ROOT / analytics_vm_path).read_text()
 
 range_for_match = re.search(
-    r"(?ms)^    private fun rangeFor\\(.*?(?=^    private fun loadPeriod\\(\\))",
+    r"(?ms)^    private fun rangeFor\(.*?(?=^    private fun loadPeriod\(\))",
     analytics_vm,
 )
 if not range_for_match:
     raise SystemExit("V18 specific date windows: could not isolate rangeFor().")
 range_for_source = range_for_match.group(0)
-specific_range_anchor = "            AnalyticsUiState.DayRange.CUSTOM_RANGE -> {\\n"
+specific_range_anchor = "            AnalyticsUiState.DayRange.CUSTOM_RANGE -> {\n"
 if range_for_source.count(specific_range_anchor) != 1:
     raise SystemExit("V18 specific date windows: rangeFor() does not contain exactly one custom-range branch.")
 range_for_source = range_for_source.replace(
