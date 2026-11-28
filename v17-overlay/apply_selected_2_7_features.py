@@ -166,6 +166,7 @@ def strip_replay_mix():
         "    var tempReplayMix by remember { mutableStateOf(emptyList<SongEntity>()) }\n",
         "        tempReplayMix = replayMix.filter { it.matches(query) }\n",
         "                    stringResource(Res.string.replay_mix_subtitle)\n",
+        "                LibraryDynamicPlaylistType.ReplayMix ->\n",
         "            ReplayMix -> Res.string.replay_mix\n",
         "            ReplayMix -> \"replay_mix\"\n",
         "                \"replay_mix\" -> ReplayMix\n",
