@@ -442,7 +442,7 @@ if "import com.maxrave.domain.data.model.streams.YouTubeWatchEndpoint\n" not in 
     )
 
 shuffle_start = re.search(
-    r"(?ms)^            PlaylistUIEvent\.Shuffle -> \{.*?(?=^            PlaylistUIEvent\.StartRadio -> \{)",
+    r"(?ms)^            PlaylistUIEvent\.Shuffle -> \{.*?(?=^[ \t]*PlaylistUIEvent\.StartRadio[ \t]*->[ \t]*\{)",
     playlist_source,
 )
 if not shuffle_start:
