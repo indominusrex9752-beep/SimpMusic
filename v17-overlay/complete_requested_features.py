@@ -1050,3 +1050,334 @@ if image_row not in settings:
     settings = replace_once(settings, image_anchor, image_row, "V18 app icon preview rendering")
 (ROOT / settings_path).write_text(settings)
 print("V18 app icon preview resource model and alert renderer connected.")
+
+
+# V18 precise day/month/year selectors. They reuse the same date-window query path as the
+# existing custom range filter and do not touch playback tracking or Cloud Sync.
+analytics_vm_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/viewModel/AnalyticsViewModel.kt"
+analytics_vm = (ROOT / analytics_vm_path).read_text()
+
+analytics_vm = replace_once(
+    analytics_vm,
+    "            AnalyticsUiState.DayRange.CUSTOM_RANGE -> {\n",
+    """            AnalyticsUiState.DayRange.SPECIFIC_DAY -> {
+                val selected = state.specificPeriodDate ?: today
+                selected.atTime(0, 0) to selected.atTime(23, 59, 59)
+            }
+
+            AnalyticsUiState.DayRange.SPECIFIC_MONTH -> {
+                val selected = state.specificPeriodDate ?: today
+                val first = LocalDate(selected.year, selected.month.number, 1)
+                val last = first.plus(DatePeriod(months = 1)).minus(DatePeriod(days = 1))
+                first.atTime(0, 0) to last.atTime(23, 59, 59)
+            }
+
+            AnalyticsUiState.DayRange.SPECIFIC_YEAR -> {
+                val selected = state.specificPeriodDate ?: today
+                LocalDate(selected.year, 1, 1).atTime(0, 0) to
+                    LocalDate(selected.year, 12, 31).atTime(23, 59, 59)
+            }
+
+            AnalyticsUiState.DayRange.CUSTOM_RANGE -> {
+""",
+    "V18 specific day/month/year date windows",
+)
+
+analytics_vm = replace_once(
+    analytics_vm,
+    "        val state = _analyticsUIState.value\n",
+    "        val state = _analyticsUIState.value\n",
+    "V18 date-window state anchor",
+)
+analytics_vm = replace_once(
+    analytics_vm,
+    "            if (dayRange == AnalyticsUiState.DayRange.ALL_TIME ||\n                dayRange == AnalyticsUiState.DayRange.CUSTOM_RANGE\n",
+    """            if (dayRange in setOf(
+                    AnalyticsUiState.DayRange.ALL_TIME,
+                    AnalyticsUiState.DayRange.CUSTOM_RANGE,
+                    AnalyticsUiState.DayRange.SPECIFIC_DAY,
+                    AnalyticsUiState.DayRange.SPECIFIC_MONTH,
+                    AnalyticsUiState.DayRange.SPECIFIC_YEAR,
+                )
+""",
+    "V18 disable previous-period comparison for fixed dates",
+)
+analytics_vm = replace_once(
+    analytics_vm,
+    "        if (_analyticsUIState.value.dayRange in setOf(AnalyticsUiState.DayRange.ALL_TIME, AnalyticsUiState.DayRange.CUSTOM_RANGE)) return\n",
+    """        if (_analyticsUIState.value.dayRange in setOf(
+                AnalyticsUiState.DayRange.ALL_TIME,
+                AnalyticsUiState.DayRange.CUSTOM_RANGE,
+                AnalyticsUiState.DayRange.SPECIFIC_DAY,
+                AnalyticsUiState.DayRange.SPECIFIC_MONTH,
+                AnalyticsUiState.DayRange.SPECIFIC_YEAR,
+            )
+        ) return
+""",
+    "V18 fixed period navigation",
+)
+analytics_vm = replace_once(
+    analytics_vm,
+    "                AnalyticsUiState.DayRange.THIS_MONTH,\n                AnalyticsUiState.DayRange.CUSTOM_RANGE -> {\n",
+    """                AnalyticsUiState.DayRange.SPECIFIC_DAY -> {
+                    chartTypes += AnalyticsUiState.ChartType.Day(startDate)
+                }
+
+                AnalyticsUiState.DayRange.SPECIFIC_MONTH -> {
+                    var weekStart = startDate
+                    while (weekStart <= endDate) {
+                        val weekEnd = minOf(endDate, weekStart.plus(DatePeriod(days = 6)))
+                        chartTypes += AnalyticsUiState.ChartType.Week(weekStart, weekEnd)
+                        weekStart = weekEnd.plus(DatePeriod(days = 1))
+                    }
+                }
+
+                AnalyticsUiState.DayRange.SPECIFIC_YEAR -> {
+                    var month = LocalDate(startDate.year, 1, 1)
+                    while (month <= endDate) {
+                        chartTypes += AnalyticsUiState.ChartType.Month(month.month, month.year)
+                        month = month.plus(DatePeriod(months = 1))
+                    }
+                }
+
+                AnalyticsUiState.DayRange.THIS_MONTH,
+                AnalyticsUiState.DayRange.CUSTOM_RANGE -> {
+""",
+    "V18 specific-period chart buckets",
+)
+analytics_vm = replace_once(
+    analytics_vm,
+    "    fun setCustomRange(\n",
+    """    fun setSpecificDate(
+        range: AnalyticsUiState.DayRange,
+        selectedDate: LocalDate,
+    ) {
+        require(range in setOf(
+            AnalyticsUiState.DayRange.SPECIFIC_DAY,
+            AnalyticsUiState.DayRange.SPECIFIC_MONTH,
+            AnalyticsUiState.DayRange.SPECIFIC_YEAR,
+        ))
+        _analyticsUIState.update {
+            it.copy(
+                dayRange = range,
+                periodOffset = 0,
+                specificPeriodDate = selectedDate,
+            )
+        }
+        loadPeriod()
+    }
+
+    fun setCustomRange(
+""",
+    "V18 specific date selection handler",
+)
+analytics_vm = replace_once(
+    analytics_vm,
+    "    val customEndDate: LocalDate? = null,\n",
+    "    val customEndDate: LocalDate? = null,\n    val specificPeriodDate: LocalDate? = null,\n",
+    "V18 selected specific date state",
+)
+analytics_vm = replace_once(
+    analytics_vm,
+    "        CUSTOM_RANGE(0),\n",
+    "        CUSTOM_RANGE(0),\n        SPECIFIC_DAY(1),\n        SPECIFIC_MONTH(31),\n        SPECIFIC_YEAR(365),\n",
+    "V18 specific period enum values",
+)
+(ROOT / analytics_vm_path).write_text(analytics_vm)
+
+# Add localized menu labels.
+strings_path = "composeApp/src/commonMain/composeResources/values/strings.xml"
+strings = (ROOT / strings_path).read_text()
+labels = {
+    "specific_day": "Specific day",
+    "specific_month": "Specific month",
+    "specific_year": "Specific year",
+}
+additions = [
+    f'    <string name="{key}">{value}</string>'
+    for key, value in labels.items()
+    if not re.search(r'<string\s+name="' + re.escape(key) + r'"(?:\s|>)', strings)
+]
+if additions:
+    strings = replace_once(strings, "</resources>", "\n".join(additions) + "\n</resources>", "V18 specific period labels")
+    (ROOT / strings_path).write_text(strings)
+
+analytics_screen_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/screen/home/analytics/AnalyticsScreen.kt"
+analytics_screen = (ROOT / analytics_screen_path).read_text()
+for anchor, addition, label in (
+    ("import androidx.compose.material3.DatePickerDialog\n", "import androidx.compose.material3.AlertDialog\n", "V18 selector AlertDialog import"),
+    ("import androidx.compose.material3.DateRangePicker\n", "import androidx.compose.material3.DatePicker\n", "V18 single-date picker import"),
+    ("import androidx.compose.material3.rememberDateRangePickerState\n", "import androidx.compose.material3.rememberDatePickerState\n", "V18 single-date picker state import"),
+    ("import androidx.compose.runtime.mutableStateOf\n", "import androidx.compose.runtime.mutableIntStateOf\n", "V18 month/year selector state import"),
+    ("import simpmusic.composeapp.generated.resources.custom_range\n", "import simpmusic.composeapp.generated.resources.specific_day\nimport simpmusic.composeapp.generated.resources.specific_month\nimport simpmusic.composeapp.generated.resources.specific_year\n", "V18 specific period label imports"),
+):
+    if addition.splitlines()[0] not in analytics_screen:
+        analytics_screen = replace_once(analytics_screen, anchor, anchor + addition, label)
+
+analytics_screen = replace_once(
+    analytics_screen,
+    "                onCustomRange = { start, end -> analyticsViewModel.setCustomRange(start, end) },\n",
+    "                onCustomRange = { start, end -> analyticsViewModel.setCustomRange(start, end) },\n                onSpecificDate = { range, date -> analyticsViewModel.setSpecificDate(range, date) },\n",
+    "V18 specific date callback",
+)
+analytics_screen = replace_once(
+    analytics_screen,
+    "    onCustomRange: (LocalDate, LocalDate) -> Unit,\n",
+    "    onCustomRange: (LocalDate, LocalDate) -> Unit,\n    onSpecificDate: (AnalyticsUiState.DayRange, LocalDate) -> Unit,\n",
+    "V18 specific date pill callback",
+)
+analytics_screen = replace_once(
+    analytics_screen,
+    "    var showCustomRange by rememberSaveable { mutableStateOf(false) }\n",
+    """    var showCustomRange by rememberSaveable { mutableStateOf(false) }
+    var showSpecificDay by rememberSaveable { mutableStateOf(false) }
+    var showSpecificPeriod by rememberSaveable { mutableStateOf(false) }
+    var specificPeriodMode by remember { mutableStateOf(AnalyticsUiState.DayRange.SPECIFIC_MONTH) }
+    val today = kotlinx.datetime.Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+    var selectedMonth by rememberSaveable { mutableIntStateOf(today.month.number) }
+    var selectedYear by rememberSaveable { mutableIntStateOf(today.year) }
+    var monthMenuExpanded by remember { mutableStateOf(false) }
+    var yearMenuExpanded by remember { mutableStateOf(false) }
+    val singleDatePickerState = rememberDatePickerState()
+""",
+    "V18 specific period picker state",
+)
+analytics_screen = replace_once(
+    analytics_screen,
+    "                AnalyticsUiState.DayRange.CUSTOM_RANGE -> Res.string.custom_range\n",
+    """                AnalyticsUiState.DayRange.CUSTOM_RANGE -> Res.string.custom_range
+                AnalyticsUiState.DayRange.SPECIFIC_DAY -> Res.string.specific_day
+                AnalyticsUiState.DayRange.SPECIFIC_MONTH -> Res.string.specific_month
+                AnalyticsUiState.DayRange.SPECIFIC_YEAR -> Res.string.specific_year
+""",
+    "V18 specific filter labels",
+)
+analytics_screen = replace_once(
+    analytics_screen,
+    "                AnalyticsUiState.DayRange.CUSTOM_RANGE -> Res.string.custom_range\n",
+    """                AnalyticsUiState.DayRange.CUSTOM_RANGE -> Res.string.custom_range
+                AnalyticsUiState.DayRange.SPECIFIC_DAY -> Res.string.specific_day
+                AnalyticsUiState.DayRange.SPECIFIC_MONTH -> Res.string.specific_month
+                AnalyticsUiState.DayRange.SPECIFIC_YEAR -> Res.string.specific_year
+""",
+    "V18 specific filter menu labels",
+)
+analytics_screen = replace_once(
+    analytics_screen,
+    """                        if (range == AnalyticsUiState.DayRange.CUSTOM_RANGE) {
+                            showCustomRange = true
+                        } else {
+                            onPick(range)
+                        }
+""",
+    """                        when (range) {
+                            AnalyticsUiState.DayRange.CUSTOM_RANGE -> showCustomRange = true
+                            AnalyticsUiState.DayRange.SPECIFIC_DAY -> showSpecificDay = true
+                            AnalyticsUiState.DayRange.SPECIFIC_MONTH,
+                            AnalyticsUiState.DayRange.SPECIFIC_YEAR -> {
+                                specificPeriodMode = range
+                                showSpecificPeriod = true
+                            }
+                            else -> onPick(range)
+                        }
+""",
+    "V18 selector menu actions",
+)
+
+dialogs = """    if (showSpecificDay) {
+        DatePickerDialog(
+            onDismissRequest = { showSpecificDay = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        singleDatePickerState.selectedDateMillis?.let { millis ->
+                            val selected = Instant.fromEpochMilliseconds(millis)
+                                .toLocalDateTime(TimeZone.UTC).date
+                            onSpecificDate(AnalyticsUiState.DayRange.SPECIFIC_DAY, selected)
+                            showSpecificDay = false
+                        }
+                    },
+                ) { Text("Apply") }
+            },
+            dismissButton = { TextButton(onClick = { showSpecificDay = false }) { Text("Cancel") } },
+        ) {
+            DatePicker(state = singleDatePickerState)
+        }
+    }
+
+    if (showSpecificPeriod) {
+        val monthNames = listOf(
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December",
+        )
+        AlertDialog(
+            onDismissRequest = { showSpecificPeriod = false },
+            title = { Text(if (specificPeriodMode == AnalyticsUiState.DayRange.SPECIFIC_MONTH) "Select month and year" else "Select year") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (specificPeriodMode == AnalyticsUiState.DayRange.SPECIFIC_MONTH) {
+                        Box {
+                            TextButton(onClick = { monthMenuExpanded = true }) {
+                                Text(monthNames[selectedMonth - 1])
+                            }
+                            DropdownMenu(
+                                expanded = monthMenuExpanded,
+                                onDismissRequest = { monthMenuExpanded = false },
+                            ) {
+                                monthNames.forEachIndexed { index, name ->
+                                    DropdownMenuItem(
+                                        text = { Text(name) },
+                                        onClick = {
+                                            selectedMonth = index + 1
+                                            monthMenuExpanded = false
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Box {
+                        TextButton(onClick = { yearMenuExpanded = true }) {
+                            Text(selectedYear.toString())
+                        }
+                        DropdownMenu(
+                            expanded = yearMenuExpanded,
+                            onDismissRequest = { yearMenuExpanded = false },
+                        ) {
+                            (2026..today.year).toList().asReversed().forEach { year ->
+                                DropdownMenuItem(
+                                    text = { Text(year.toString()) },
+                                    onClick = {
+                                        selectedYear = year
+                                        yearMenuExpanded = false
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val month = if (specificPeriodMode == AnalyticsUiState.DayRange.SPECIFIC_MONTH) selectedMonth else 1
+                        onSpecificDate(specificPeriodMode, LocalDate(selectedYear, month, 1))
+                        showSpecificPeriod = false
+                    },
+                ) { Text("Apply") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSpecificPeriod = false }) { Text("Cancel") }
+            },
+        )
+    }
+
+"""
+analytics_screen = replace_once(
+    analytics_screen,
+    "    if (showCustomRange) {\n",
+    dialogs + "    if (showCustomRange) {\n",
+    "V18 specific day/month/year selector dialogs",
+)
+(ROOT / analytics_screen_path).write_text(analytics_screen)
+print("V18 specific day, month and year selectors added to Insights.")
