@@ -208,10 +208,12 @@ old_refresh = """    LaunchedEffect(localTrackingEnabled) {
         if (localTrackingEnabled) viewModel.refreshReplayMixPreview()
     }"""
 new_refresh = """    LaunchedEffect(Unit) { viewModel.refreshReplayMixPreview() }"""
-if old_refresh in library:
-    library = replace_once(library, old_refresh, new_refresh, "Replay Mix preview refresh")
-if "showReplayMix = localTrackingEnabled" in library:
-    library = replace_once(library, "showReplayMix = localTrackingEnabled", "showReplayMix = true", "Always-visible Replay Mix card")
+if old_refresh not in library:
+    raise SystemExit("Could not find the legacy Replay Mix refresh gate; refusing to ship a visible but empty card.")
+library = replace_once(library, old_refresh, new_refresh, "Replay Mix preview refresh")
+if "showReplayMix = localTrackingEnabled" not in library:
+    raise SystemExit("Could not find the legacy Replay Mix visibility gate.")
+library = replace_once(library, "showReplayMix = localTrackingEnabled", "showReplayMix = true", "Always-visible Replay Mix card")
 (ROOT / library_path).write_text(library)
 
 # Guard against silently shipping a partial implementation.
