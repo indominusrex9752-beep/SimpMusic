@@ -46,7 +46,7 @@ for path in (
 # by Kotlin Multiplatform common code, so keep Settings search normalization portable.
 setting_item_path = "composeApp/src/commonMain/kotlin/com/maxrave/simpmusic/ui/component/SettingItem.kt"
 setting_item = (ROOT / setting_item_path).read_text()
-setting_item = setting_item.replace("import java.text.Normalizer\\n", "")
+setting_item = setting_item.replace("import java.text.Normalizer\n", "")
 normalizer_block = """fun searchKey(text: String): String =
     Normalizer
         .normalize(text.lowercase(), Normalizer.Form.NFD)
@@ -59,7 +59,7 @@ if normalizer_block in setting_item:
     setting_item = replace_once(setting_item, normalizer_block, portable_search_key, "Multiplatform Settings search normalization")
 elif "fun searchKey(text: String): String = text.lowercase().replace('đ', 'd')" not in setting_item:
     raise SystemExit("Could not make Settings search normalization Kotlin Multiplatform-safe.")
-setting_item = setting_item.replace("private val CombiningMarks = Regex(\\"\\\\p{Mn}+\\")\\n", "")
+setting_item = "\n".join(line for line in setting_item.splitlines() if not line.startswith("private val CombiningMarks")) + "\n"
 (ROOT / setting_item_path).write_text(setting_item)
 
 # Copy the official Android launcher-icon resources, including adaptive-icon XML and densities.
@@ -238,13 +238,13 @@ animated_row_new = """                    SettingItem(
 """
 if animated_row_old in settings:
     settings = replace_once(settings, animated_row_old, "", "Extract animated lyrics preference from Android 12 gate")
-    gate_end = "\\n                    }\\n\\n                    // Independent of BOTH style settings"
+    gate_end = "\n                    }\n\n                    // Independent of BOTH style settings"
     if gate_end not in settings:
         raise SystemExit("Could not locate the end of the Android 12 lyrics-style gate.")
     settings = replace_once(
         settings,
         gate_end,
-        "\\n                    }\\n\\n" + animated_row_new + "                    // Independent of BOTH style settings",
+        "\n                    }\n\n" + animated_row_new + "                    // Independent of BOTH style settings",
         "Place animated lyrics preference outside Android 12 gate",
     )
 elif animated_row_new not in settings:
@@ -252,7 +252,7 @@ elif animated_row_new not in settings:
 
 animated_row = settings.index("title = stringResource(Res.string.animated_lyrics_background)")
 lyrics_gate = settings.rfind("if (isLyricsBlurSupported())", 0, animated_row)
-if lyrics_gate >= 0 and "\\n                    }\\n\\n" not in settings[lyrics_gate:animated_row]:
+if lyrics_gate >= 0 and "\n                    }\n\n" not in settings[lyrics_gate:animated_row]:
     raise SystemExit("Animated lyrics preference is still nested inside the Android 12-only section.")
 if "requiresAndroid12" not in settings[animated_row:animated_row + 500]:
     raise SystemExit("Animated lyrics option does not explain the Android 12 effect requirement.")
