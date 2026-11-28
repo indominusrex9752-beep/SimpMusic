@@ -119,7 +119,7 @@ for line in imports.splitlines(True):
 # existing V17 row, including Google OAuth/Supabase controls, and filters rather than replacing it.
 state_anchor = "    val settingListState = rememberLazyListState()\n"
 state_add = (
-    "    var searchQuery by rememberSaveable { mutableStateOf(\\"\\") }\n"
+    '    var searchQuery by rememberSaveable { mutableStateOf("") }\n'
     "    val searchText = remember(searchQuery) { searchKey(searchQuery.trim()) }\n"
 )
 if "var searchQuery by rememberSaveable" not in settings:
