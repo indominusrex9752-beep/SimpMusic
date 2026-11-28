@@ -79,6 +79,17 @@ if not any("ic_launcher_old_school" in p for p in icon_paths):
 for path in icon_paths:
     copy_bytes(path)
 
+for icon_name in (
+    "app_icon_option_liquid_glass.png",
+    "app_icon_option_old_school.png",
+    "app_icon_option_minimalism_light.png",
+    "app_icon_option_minimalism_dark.png",
+    "app_icon_option_pixel.png",
+):
+    icon_file = ROOT / "composeApp/src/commonMain/composeResources/drawable" / icon_name
+    if not icon_file.is_file() or icon_file.stat().st_size == 0:
+        raise SystemExit(f"V18 Compose app-icon preview resource missing or empty: {icon_file}")
+
 # Insert only the official activity-alias declarations. Preserve the V17 application, OAuth,
 # permissions, services, providers and manifest metadata.
 manifest_path = "androidApp/src/main/AndroidManifest.xml"
@@ -299,7 +310,7 @@ old_icon_options = """                        val options = listOf(
                             AppIconStyle.PIXEL to stringResource(Res.string.app_icon_pixel),
                         )
 """
-new_icon_options = """                        val options = listOf(
+new_icon_options = """                        val options: List<Triple<AppIconStyle, String, DrawableResource>> = listOf(
                             Triple(AppIconStyle.LIQUID_GLASS, stringResource(Res.string.app_icon_liquid_glass), Res.drawable.app_icon_option_liquid_glass),
                             Triple(AppIconStyle.OLD_SCHOOL, stringResource(Res.string.app_icon_old_school), Res.drawable.app_icon_option_old_school),
                             Triple(AppIconStyle.MINIMALISM_LIGHT, stringResource(Res.string.app_icon_minimalism_light), Res.drawable.app_icon_option_minimalism_light),
@@ -1116,6 +1127,7 @@ for anchor, addition, label in (
     ("import androidx.compose.foundation.MarqueeAnimationMode\n", "import androidx.compose.foundation.Image\n", "V18 Settings image import"),
     ("import androidx.compose.foundation.lazy.items\n", "import androidx.compose.foundation.lazy.itemsIndexed\n", "V18 Settings indexed items import"),
     ("import org.jetbrains.compose.resources.stringResource\n", "import org.jetbrains.compose.resources.painterResource\n", "V18 Settings painter import"),
+    ("import org.jetbrains.compose.resources.painterResource\n", "import org.jetbrains.compose.resources.DrawableResource\n", "V18 Settings drawable resource type import"),
 ):
     if addition not in settings:
         settings = replace_once(settings, anchor, anchor + addition, label)
