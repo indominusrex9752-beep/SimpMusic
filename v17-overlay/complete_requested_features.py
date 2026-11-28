@@ -847,6 +847,14 @@ if missing_ranges:
         + body
         + analytics_vm[enum_match.end(2):]
     )
+verified_enum = day_range_enum.search(analytics_vm)
+if not verified_enum:
+    raise SystemExit("V18 Analytics range options: DayRange enum was lost after insertion.")
+verified_body = verified_enum.group(2)
+for required_name, _ in required_ranges:
+    count = len(re.findall(rf"(?m)^\\s*{required_name}\\s*\\(", verified_body))
+    if count != 1:
+        raise SystemExit(f"V18 Analytics range options: expected exactly one {required_name}, found {count}.")
 (ROOT / analytics_vm_path).write_text(analytics_vm)
 
 # Extend the official 2.7 range pill with month/all-time choices and a native date-range picker.
