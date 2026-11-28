@@ -806,8 +806,8 @@ custom_method = """    fun setCustomRange(
 if "fun setCustomRange(" not in analytics_vm:
     analytics_vm = replace_once(
         analytics_vm,
-        "    fun setDayRange(dayRange: AnalyticsUiState.DayRange) {\\n",
-        custom_method + "    fun setDayRange(dayRange: AnalyticsUiState.DayRange) {\\n",
+        "    fun setDayRange(dayRange: AnalyticsUiState.DayRange) {\n",
+        custom_method + "    fun setDayRange(dayRange: AnalyticsUiState.DayRange) {\n",
         "V18 custom date-range setter",
     )
 
@@ -820,16 +820,23 @@ for field in ("customStartDate", "customEndDate"):
     if not matches:
         analytics_vm = replace_once(
             analytics_vm,
-            "    val periodEnd: LocalDate? = null,\\n",
-            "    val periodEnd: LocalDate? = null,\\n" + declaration + "\\n",
+            "    val periodEnd: LocalDate? = null,\n",
+            "    val periodEnd: LocalDate? = null,\n" + declaration + "\n",
             f"V18 custom date-range state: {field}",
         )
     elif len(matches) > 1:
         keep = matches[0]
-        analytics_vm = "\\n".join(
+        analytics_vm = "\n".join(
             line for i, line in enumerate(lines)
             if line.strip() != declaration.strip() or i == keep
-        ) + "\\n"
+        ) + "\n"
+# Validate the custom date API before any later workflow stage can run.
+if analytics_vm.count("fun setCustomRange(") != 1:
+    raise SystemExit("V18 custom date-range setter validation failed.")
+for field in ("customStartDate", "customEndDate"):
+    if len(re.findall(rf"(?m)^\\s*val {field}: LocalDate\\? = null,", analytics_vm)) != 1:
+        raise SystemExit(f"V18 custom date-range state validation failed for {field}.")
+
 # The Insights archive and official 2.7 source use different comments/spacing here.
 # Extend the actual enum structurally, adding only missing values.
 day_range_enum = re.compile(
